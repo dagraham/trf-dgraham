@@ -36,6 +36,10 @@ def backup_to_zip(trf_home, today):
     return (True, f"Backup completed: {backup_zip}")
 
 def rotate_backups(trf_home):
+    # entry point for backups - make sure backup dir exists
+    backup_dir = os.path.join(trf_home, 'backup')
+    os.makedirs(backup_dir, exist_ok=True)
+
     today = datetime.today()
     ok, msg = backup_to_zip(trf_home, today)
     if not ok:
