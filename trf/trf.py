@@ -1,20 +1,185 @@
 # trf/trf.py
-import sys, os
+from typing import List, Dict, Any, Callable, Mapping
+from prompt_toolkit import Application
+from prompt_toolkit.layout import Layout
+from prompt_toolkit.layout.containers import (
+    HSplit,
+    VSplit,
+    Window,
+    DynamicContainer,
+    WindowAlign,
+    ConditionalContainer,
+)
+from prompt_toolkit.layout.dimension import D
+from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.keys import Keys
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.styles import Style
+from prompt_toolkit.styles.named_colors import NAMED_COLORS
+from prompt_toolkit.lexers import Lexer
+
+from datetime import datetime, timedelta, date
+import time
+from prompt_toolkit.widgets import (
+    TextArea,
+    SearchToolbar,
+    MenuContainer,
+    MenuItem,
+    HorizontalLine,
+)
+from prompt_toolkit.key_binding.bindings.focus import (
+    focus_next,
+    focus_previous,
+)
+from prompt_toolkit.application.current import get_app
+from prompt_toolkit.key_binding import KeyBindings
+from io import StringIO
+from dateutil.parser import parse, parserinfo
+import string
+import shutil
+import threading
+import traceback
+    # initialize the tracker manager as a singleton instance
+import textwrap
+import sys
+import os
+import re
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.layout import Layout
 import logging
+# from ZODB import DB, FileStorage
+from persistent import Persistent
 
-from . import init_db, close_db, setup_logging
+from . import trf_home, logger, backup_dir, db_path
+from . import storage, db, connection, root, transaction
 from .backup import backup_to_zip, rotate_backups, restore_from_zip
 
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
+
+def clear_screen():
+    # For Windows
+    if os.name == 'nt':
+        os.system('cls')
+    # For macOS and Linux (posix systems)
+    else:
+        os.system('clear')
+
+# Initialize YAML object
+yaml = YAML()
+
+# Create a CommentedMap, which behaves like a Python dictionary but supports comments
+settings_map = CommentedMap({
+    'ampm': True,
+    'yearfirst': True,
+    'dayfirst': False,
+    'η': 2
+})
+# Add comments to the dictionary
+settings_map.yaml_set_comment_before_after_key('ampm', before='Track Settings\n\n[ampm] Display 12-hour times with AM or PM if true, \notherwise display 24-hour times')
+settings_map.yaml_set_comment_before_after_key('yearfirst', before='\n[yearfirst] When parsing ambiguous dates, assume the year is first if true, \notherwise assume the month is first')
+settings_map.yaml_set_comment_before_after_key('dayfirst', before='\n[dayfirst] When parsing ambiguous dates, assume the day is first if true, \notherwise assume the month is first')
+settings_map.yaml_set_comment_before_after_key('η', before='\n[η] Use this integer multiple of "spread" for setting the early-to-late \nforecast confidence interval')
+
+
 # this will be set in main() as a global variable
-logger = None
+# logger = None
+
+# Non-printing character
+NON_PRINTING_CHAR = '\u200B'
+# Placeholder for spaces within special tokens
+PLACEHOLDER = '\u00A0'
+# Placeholder for hyphens to prevent word breaks
+NON_BREAKING_HYPHEN = '\u2011'
+# Placeholder for zero-width non-joiner
+ZWNJ = '\u200C'
+
+# For showing active page in pages, e.g.,  ○ ○ ⏺ ○ = page 3 of 4 pages
+OPEN_CIRCLE = '○'
+CLOSED_CIRCLE = '⏺'
+# num_sigma = 'η'
+
+
+def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 2):
+    # Preprocess to replace spaces within specific "@\S" patterns with PLACEHOLDER
+    text = preprocess_text(text)
+    numbered_list = re.compile(r'^\d+\.\s.*')
+
+    # Split text into paragraphs
+    paragraphs = text.split('\n')
+
+    # Wrap each paragraph
+    wrapped_paragraphs = []
+    for para in paragraphs:
+        leading_whitespace = re.match(r'^\s*', para).group()
+        initial_indent = leading_whitespace
+
+        # Determine subsequent_indent based on the first non-whitespace character
+        stripped_para = para.lstrip()
+        if stripped_para.startswith(('+', '-', '*', '%', '!', '~')):
+            subsequent_indent = initial_indent + ' ' * 2
+        elif stripped_para.startswith(('@', '&')):
+            subsequent_indent = initial_indent + ' ' * 3
+        # elif stripped_para and stripped_para[0].isdigit():
+        elif stripped_para and numbered_list.match(stripped_para):
+            subsequent_indent = initial_indent + ' ' * 3
+        else:
+            subsequent_indent = initial_indent + ' ' * indent
+
+        wrapped = textwrap.fill(
+            para,
+            initial_indent='',
+            subsequent_indent=subsequent_indent,
+            width=width)
+        wrapped_paragraphs.append(wrapped)
+
+    # Join paragraphs with newline followed by non-printing character
+    wrapped_text = ('\n' + NON_PRINTING_CHAR).join(wrapped_paragraphs)
+
+    # Postprocess to replace PLACEHOLDER and NON_BREAKING_HYPHEN back with spaces and hyphens
+    wrapped_text = postprocess_text(wrapped_text)
+
+    return wrapped_text
+
+def preprocess_text(text):
+    # Regex to find "@\S" patterns and replace spaces within the pattern with PLACEHOLDER
+    text = re.sub(r'(@\S+\s\S+)', lambda m: m.group(0).replace(' ', PLACEHOLDER), text)
+    # Replace hyphens within words with NON_BREAKING_HYPHEN
+    text = re.sub(r'(\S)-(\S)', lambda m: m.group(1) + NON_BREAKING_HYPHEN + m.group(2), text)
+    return text
+
+def postprocess_text(text):
+    text = text.replace(PLACEHOLDER, ' ')
+    text = text.replace(NON_BREAKING_HYPHEN, '-')
+    return text
+
+def unwrap(wrapped_text):
+    # Split wrapped text into paragraphs
+    paragraphs = wrapped_text.split('\n' + NON_PRINTING_CHAR)
+
+    # Replace newlines followed by spaces in each paragraph with a single space
+    unwrapped_paragraphs = []
+    for para in paragraphs:
+        unwrapped = re.sub(r'\n\s*', ' ', para)
+        unwrapped_paragraphs.append(unwrapped)
+
+    # Join paragraphs with original newlines
+    unwrapped_text = '\n'.join(unwrapped_paragraphs)
+
+    return unwrapped_text
+
+def sort_key(tracker):
+    # Sorting by None first (using doc_id as secondary sorting)
+    if tracker.next_expected_completion is None:
+        return (0, tracker.doc_id)
+    # Sorting by datetime for non-None values
+    else:
+        return (1, tracker.next_expected_completion)
 
 # this is a singleton instance initialized in main()
-tracker_manager = TrackerManager()
-
 class Tracker(Persistent):
     max_history = 12 # depending on width, 6 rows of 2, 4 rows of 3, 3 rows of 4, 2 rows of 6
 
@@ -244,7 +409,7 @@ class Tracker(Persistent):
             if result['num_completions'] > 0:
                 for i in range(len(self.history)-1):
                     #                      x[i+1]                  y[i+1]               x[i]
-                    logger.debug(f"{self.history[i+1]}")
+                    # logger.debug(f"{self.history[i+1]}")
                     result['intervals'].append(self.history[i+1][0] + self.history[i+1][1] - self.history[i][0])
                 result['num_intervals'] = len(result['intervals'])
             if result['num_intervals'] > 0:
@@ -259,7 +424,7 @@ class Tracker(Persistent):
                 change = result['intervals'][-1] - result['average_interval']
                 direction = "↑" if change > timedelta(0) else "↓" if change < timedelta(0) else "→"
                 result['avg'] = f"{Tracker.format_td(result['average_interval'], True)}{direction}"
-                logger.debug(f"{result['avg'] = }")
+                # logger.debug(f"{result['avg'] = }")
             if result['num_intervals'] >= 2:
                 total = timedelta(minutes=0)
                 for interval in result['intervals']:
@@ -388,6 +553,7 @@ class Tracker(Persistent):
             print("Invalid input. Please enter a number.")
 
     def get_tracker_info(self):
+
         if not hasattr(self, '_info') or self._info is None:
             self._info = self.compute_info()
         logger.debug(f"{self._info = }")
@@ -415,18 +581,24 @@ class Tracker(Persistent):
     late:     {Tracker.format_dt(self._info.get('late', '?'))}
 """, 0)
 
+def page_banner(active_page_num: int, number_of_pages: int):
+    markers = []
+    for i in range(1, number_of_pages + 1):
+        marker = CLOSED_CIRCLE if i == active_page_num else OPEN_CIRCLE
+        markers.append(marker)
+    return ' '.join(markers)
+
 class TrackerManager:
-    labels = "abcdefghijklmnopqrstuvwxyz"
 
-    _instance = None
+    def __init__(self, storage, db, connection, root, transaction) -> None:
+        print(f"in TrackerManager.init: {storage = }, {db = }, {connection = }, {root = }, {transaction = }")
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super(TrackerManager, cls).__new__(cls)
-            cls._instance.init(*args, **kwargs)
-        return cls._instance
+        # Ensure that all required arguments are provided during the first initialization
+        if db is None or connection is None or root is None or transaction is None:
+            raise ValueError("db, connection, root, and transaction must be provided on the first initialization.")
 
-    def __init__(self, db, connection, root, transaction) -> None:
+        # Initialize instance attributes
+        self.storage = storage
         self.db = db
         self.connection = connection
         self.root = root
@@ -438,7 +610,7 @@ class TrackerManager:
         self.id_to_times = {}
         self.active_page = 0
         self.sort_by = "forecast"
-        logger.debug(f"using data from\n  {self.db_path}")
+        logger.debug(f"using data from\n  {self.db}")
         self.load_data()
 
     def load_data(self):
@@ -453,7 +625,7 @@ class TrackerManager:
                 self.transaction.commit()
             self.trackers = self.root['trackers']
         except Exception as e:
-            logger.debug(f"Warning: could not load data from '{self.db_path}': {str(e)}")
+            logger.debug(f"Warning: could not load data from '{db_path}': {str(e)}")
             self.trackers = {}
 
     def restore_defaults(self):
@@ -584,7 +756,7 @@ class TrackerManager:
             forecast = forecast_dt.strftime("%y-%m-%d") if forecast_dt else center_text("~", 8)
             avg = tracker._info.get('avg', None) if hasattr(tracker, '_info') else None
             interval = f"{avg: <8}" if avg else f"{'~': ^8}"
-            tag = TrackerManager.labels[count]
+            tag = tag_keys[count]
             self.id_to_times[tracker.doc_id] = (early.strftime("%y-%m-%d") if early else '', late.strftime("%y-%m-%d") if late else '')
             self.tag_to_id[(self.active_page, tag)] = tracker.doc_id
             self.row_to_id[(self.active_page, count+1)] = tracker.doc_id
@@ -623,6 +795,7 @@ class TrackerManager:
         return self.trackers[self.row_to_id[pagerow]]
 
     def save_data(self):
+        logger.debug(f"Saving data: {self.trackers = }")
         self.root['trackers'] = self.trackers
         self.transaction.commit()
 
@@ -664,13 +837,740 @@ class TrackerManager:
         finally:
             self.connection.close()
 
+# print(f"db: {db = }, {connection = }, {root = }, {transaction = }")
+tracker_manager = TrackerManager(storage, db, connection, root, transaction)
+print(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
+
+
 tag_msg = "Press the key corresponding to the tag of the tracker"
 tag_keys = list(string.ascii_lowercase)
 tag_keys.append('escape')
 bool_keys = ['y', 'n', 'escape', 'enter']
 
 # Application Setup
+tracker_style = {
+    'next-warn': 'fg:darkorange',
+    'next-alert': 'fg:gold',
+    'next-fine': 'fg:lightskyblue',
+    'last-less': '',
+    'last-more': '',
+    'no-dates': '',
+    'default': '',
+    'banner': 'fg:limegreen',
+    'tag': 'fg:gray',
+}
+
+banner_regex = re.compile(r'^\u200C')
+
+class DefaultLexer(Lexer):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(DefaultLexer, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            self._initialized = True
+            now = datetime.now()
+        now = datetime.now()
+
+    def lex_document(self, document):
+        # Implement the logic for tokenizing the document here.
+        # You should yield tuples of (start_pos, Token) pairs for each token in the document.
+
+        # Example: Basic tokenization that highlights keywords in a simple way.
+        text = document.text
+        for i, line in enumerate(text.splitlines()):
+            if "keyword" in line:
+                yield i, ('class:keyword', line)
+            else:
+                yield i, ('', line)
+
+
+class InfoLexer(Lexer):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(InfoLexer, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            self._initialized = True
+            now = datetime.now()
+        now = datetime.now()
+
+    def lex_document(self, document):
+        # Implement the logic for tokenizing the document here.
+        # You should yield tuples of (start_pos, Token) pairs for each token in the document.
+
+        # Example: Basic tokenization that highlights keywords in a simple way.
+        logger.debug("lex_document called")
+        active_page = tracker_manager.active_page
+        lines = document.lines
+        now = datetime.now().strftime("%y-%m-%d")
+        def get_line_tokens(line_number):
+            line = lines[line_number]
+            tokens = []
+            if line:
+                tokens.append((tracker_style.get('default', ''), line))
+            return tokens
+        return get_line_tokens
+
+
+class HelpLexer(Lexer):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(HelpLexer, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            self._initialized = True
+            now = datetime.now()
+        now = datetime.now()
+
+    def lex_document(self, document):
+        # Implement the logic for tokenizing the document here.
+        # You should yield tuples of (start_pos, Token) pairs for each token in the document.
+
+        # Example: Basic tokenization that highlights keywords in a simple way.
+        logger.debug("lex_document called")
+        active_page = tracker_manager.active_page
+        lines = document.lines
+        now = datetime.now().strftime("%y-%m-%d")
+        def get_line_tokens(line_number):
+            line = lines[line_number]
+            tokens = []
+            if line:
+                tokens.append((tracker_style.get('default', ''), line))
+            return tokens
+        return get_line_tokens
+
+
+
+class TrackerLexer(Lexer):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(TrackerLexer, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            self._initialized = True
+            now = datetime.now()
+        now = datetime.now()
+
+    def lex_document(self, document):
+        # logger.debug("lex_document called")
+        active_page = tracker_manager.active_page
+        lines = document.lines
+        now = datetime.now().strftime("%y-%m-%d")
+        def get_line_tokens(line_number):
+            line = lines[line_number]
+            tokens = []
+
+            if line and line[0] == ' ':  # does line start with a space
+                parts = line.split()
+                if len(parts) < 4:
+                    return [(tracker_style.get('default', ''), line)]
+
+                # Extract the parts of the line
+                tag, next_date, spread, last_date, tracker_name = parts[0], parts[1], parts[2], parts[3], " ".join(parts[4:])
+                id = tracker_manager.tag_to_id.get((active_page, tag), None)
+                alert, warn = tracker_manager.id_to_times.get(id, (None, None))
+
+                # Determine styles based on dates
+                if alert and warn:
+                    if now < alert:
+                        # logger.debug("fine")
+                        next_style = tracker_style.get('next-fine', '')
+                        last_style = tracker_style.get('next-fine', '')
+                        spread_style = tracker_style.get('next-fine', '')
+                        name_style = tracker_style.get('next-fine', '')
+                    elif now >= alert and now < warn:
+                        # logger.debug("alert")
+                        next_style = tracker_style.get('next-alert', '')
+                        last_style = tracker_style.get('next-alert', '')
+                        spread_style = tracker_style.get('next-alert', '')
+                        name_style = tracker_style.get('next-alert', '')
+                    elif now >= warn:
+                        # logger.debug("warn")
+                        next_style = tracker_style.get('next-warn', '')
+                        last_style = tracker_style.get('next-warn', '')
+                        spread_style = tracker_style.get('next-warn', '')
+                        name_style = tracker_style.get('next-warn', '')
+                elif next_date != "~" and next_date > now:
+                    next_style = tracker_style.get('next-fine', '')
+                    last_style = tracker_style.get('next-fine', '')
+                    spread_style = tracker_style.get('next-fine', '')
+                    name_style = tracker_style.get('next-fine', '')
+                else:
+                    next_style = tracker_style.get('default', '')
+                    last_style = tracker_style.get('default', '')
+                    spread_style = tracker_style.get('default', '')
+                    name_style = tracker_style.get('default', '')
+
+                # Format each part with fixed width
+                tag_formatted = f"  {tag:<5}"          # 7 spaces for tag
+                next_formatted = f"{next_date:^8}  "  # 10 spaces for next date
+                last_formatted = f"{last_date:^8}  "  # 10 spaces for last date
+                if spread == "~":
+                    spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
+                else:
+                    spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
+                # Add the styled parts to the tokens list
+                tokens.append((tracker_style.get('tag', ''), tag_formatted))
+                tokens.append((next_style, next_formatted))
+                tokens.append((spread_style, spread_formatted))
+                tokens.append((last_style, last_formatted))
+                tokens.append((name_style, tracker_name))
+            elif banner_regex.match(line):
+                tokens.append((tracker_style.get('banner', ''), line))
+            else:
+                tokens.append((tracker_style.get('default', ''), line))
+            # logger.debug(f"tokens: {tokens}")
+            return tokens
+
+        return get_line_tokens
+
+    @staticmethod
+    def _parse_date(date_str):
+        return datetime.strptime(date_str, "%y-%m-%d")
+
+def get_lexer(document_type):
+    if document_type == 'list':
+        return TrackerLexer()
+    elif document_type == 'info':
+        return InfoLexer()
+    else:
+        return DefaultLexer()
+
+class TrackerLexer(Lexer):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(TrackerLexer, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            self._initialized = True
+            now = datetime.now()
+        now = datetime.now()
+
+    def lex_document(self, document):
+        # logger.debug("lex_document called")
+        active_page = tracker_manager.active_page
+        lines = document.lines
+        now = datetime.now().strftime("%y-%m-%d")
+        def get_line_tokens(line_number):
+            line = lines[line_number]
+            tokens = []
+
+            if line and line[0] == ' ':  # does line start with a space
+                parts = line.split()
+                if len(parts) < 4:
+                    return [(tracker_style.get('default', ''), line)]
+
+                # Extract the parts of the line
+                tag, next_date, spread, last_date, tracker_name = parts[0], parts[1], parts[2], parts[3], " ".join(parts[4:])
+                id = tracker_manager.tag_to_id.get((active_page, tag), None)
+                alert, warn = tracker_manager.id_to_times.get(id, (None, None))
+
+                # Determine styles based on dates
+                if alert and warn:
+                    if now < alert:
+                        # logger.debug("fine")
+                        next_style = tracker_style.get('next-fine', '')
+                        last_style = tracker_style.get('next-fine', '')
+                        spread_style = tracker_style.get('next-fine', '')
+                        name_style = tracker_style.get('next-fine', '')
+                    elif now >= alert and now < warn:
+                        # logger.debug("alert")
+                        next_style = tracker_style.get('next-alert', '')
+                        last_style = tracker_style.get('next-alert', '')
+                        spread_style = tracker_style.get('next-alert', '')
+                        name_style = tracker_style.get('next-alert', '')
+                    elif now >= warn:
+                        # logger.debug("warn")
+                        next_style = tracker_style.get('next-warn', '')
+                        last_style = tracker_style.get('next-warn', '')
+                        spread_style = tracker_style.get('next-warn', '')
+                        name_style = tracker_style.get('next-warn', '')
+                elif next_date != "~" and next_date > now:
+                    next_style = tracker_style.get('next-fine', '')
+                    last_style = tracker_style.get('next-fine', '')
+                    spread_style = tracker_style.get('next-fine', '')
+                    name_style = tracker_style.get('next-fine', '')
+                else:
+                    next_style = tracker_style.get('default', '')
+                    last_style = tracker_style.get('default', '')
+                    spread_style = tracker_style.get('default', '')
+                    name_style = tracker_style.get('default', '')
+
+                # Format each part with fixed width
+                tag_formatted = f"  {tag:<5}"          # 7 spaces for tag
+                next_formatted = f"{next_date:^8}  "  # 10 spaces for next date
+                last_formatted = f"{last_date:^8}  "  # 10 spaces for last date
+                if spread == "~":
+                    spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
+                else:
+                    spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
+                # Add the styled parts to the tokens list
+                tokens.append((tracker_style.get('tag', ''), tag_formatted))
+                tokens.append((next_style, next_formatted))
+                tokens.append((spread_style, spread_formatted))
+                tokens.append((last_style, last_formatted))
+                tokens.append((name_style, tracker_name))
+            elif banner_regex.match(line):
+                tokens.append((tracker_style.get('banner', ''), line))
+            else:
+                tokens.append((tracker_style.get('default', ''), line))
+            # logger.debug(f"tokens: {tokens}")
+            return tokens
+
+        return get_line_tokens
+
+    @staticmethod
+    def _parse_date(date_str):
+        return datetime.strptime(date_str, "%y-%m-%d")
+
+
+# def get_tracker_manager():
+#     # Return the singleton instance
+#     return TrackerManager()
+
+# tracker_manager = TrackerManager()
+# print(f"tracker_manager: {tracker_manager.__dict__ = }")
+
+def format_statustime(obj, freq: int = 0):
+    width = shutil.get_terminal_size()[0]
+    ampm = True
+    dayfirst = False
+    yearfirst = True
+    seconds = int(obj.strftime('%S'))
+    dots = ' ' + (seconds // freq) * '.' if freq > 0 else ''
+    month = obj.strftime('%b')
+    day = obj.strftime('%-d')
+    hourminutes = (
+        obj.strftime(' %-I:%M%p').rstrip('M').lower()
+        if ampm
+        else obj.strftime(' %H:%M')
+    ) + dots
+    if width < 25:
+        weekday = ''
+        monthday = ''
+    elif width < 30:
+        weekday = f' {obj.strftime("%a")}'
+        monthday = ''
+    else:
+        weekday = f'{obj.strftime("%a")}'
+        monthday = f' {day} {month}' if dayfirst else f' {month} {day}'
+    return f' {weekday}{monthday}{hourminutes}'
+
+# Define the style
+style = Style.from_dict({
+    'menu-bar': f'bg:#396060 {NAMED_COLORS["White"]}',
+    'display-area': f'bg:#1d3030 {NAMED_COLORS["White"]}',
+    'input-area': f'bg:#1d3030 {NAMED_COLORS["Gold"]}',
+    'message-window': f'bg:#1d3030 {NAMED_COLORS["LimeGreen"]}',
+    'status-window': f'bg:#396060 {NAMED_COLORS["White"]}',
+})
+
+def check_alarms():
+    """Periodic task to check alarms."""
+    today = (datetime.now()-timedelta(days=1)).strftime("%y-%m-%d")
+    while True:
+        f = freq  # Interval (e.g., 6, 12, 30, 60 seconds)
+        s = int(datetime.now().second)
+        n = s % f
+        w = f if n == 0 else f - n
+        time.sleep(w)  # Wait for the next interval
+        ct = datetime.now()
+        current_time = format_statustime(ct, freq)
+        message = f"{current_time}"
+        update_status(message)
+        newday = ct.strftime("%y-%m-%d")
+        if newday != today:
+            logger.debug(f"new day: {newday}")
+            today = newday
+            rotate_backups(trf_home)
+
+def start_periodic_checks():
+    """Start the periodic check for alarms in a separate thread."""
+    threading.Thread(target=check_alarms, daemon=True).start()
+
+def center_text(text, width: int = shutil.get_terminal_size()[0] - 2):
+    if len(text) >= width:
+        return text
+    total_padding = width - len(text)
+    left_padding = total_padding // 2
+    right_padding = total_padding - left_padding
+    return ' ' * left_padding + text + ' ' * right_padding
+
+
+menu_mode = [True]
+select_mode = [False]
+bool_mode = [False]
+integer_mode = [False]
+character_mode = [False]
+input_mode = [False]
+dialog_visible = [False]
+input_visible = [False]
+action = [None]
+
+selected_id = None
+
+# Tracker mapping example
+# UI Components
+menu_text = "menu  a)dd d)elete e)dit i)nfo l)ist r)ecord s)how ^q)uit"
+menu_container = Window(content=FormattedTextControl(text=menu_text), height=1, style="class:menu-bar")
+
+search_field = SearchToolbar(
+    text_if_not_searching=[
+    ('class:not-searching', "Press '/' to start searching.")
+    ],
+    ignore_case=True,
+    )
+
+def update_status(new_message):
+    status_control.text = new_message
+    app.invalidate()  # Request a UI refresh
+
+tracker_lexer = TrackerLexer()
+info_lexer = InfoLexer()
+help_lexer = HelpLexer()
+default_lexer = DefaultLexer()
+
+display_area = TextArea(text="", read_only=True, search_field=search_field, lexer=tracker_lexer)
+
+def set_lexer(document_type: str):
+    if document_type == 'list':
+        display_area.lexer = tracker_lexer
+    elif document_type == 'info':
+        display_area.lexer = info_lexer
+    elif document_type == 'help':
+        display_area.lexer = help_lexer
+    else:
+        display_area.lexer = default_lexer
+
+input_area = TextArea(
+    focusable=True,
+    multiline=True,
+    prompt='> ',
+    height=D(preferred=1, max=10),  # Set preferred and max height
+    style="class:input-area"
+)
+
+dynamic_input_area = DynamicContainer(lambda: input_area)
+
+dialog_visible = [False]
+input_visible = [False]
+action = [None]
+
+input_container = ConditionalContainer(
+    content=dynamic_input_area,
+    filter=Condition(lambda: input_visible[0])
+)
+
+message_control = FormattedTextControl(text="")
+
+message_window = DynamicContainer(
+    lambda: Window(
+        content=message_control,
+        height=D(preferred=1),  # Adjust max height as needed
+        style="class:message-window"
+    )
+)
+
+
+dialog_area = HSplit(
+        [
+            message_window,
+            HorizontalLine(),
+            input_container,
+        ]
+    )
+
+dialog_container = ConditionalContainer(
+    content=dialog_area,
+    filter=Condition(lambda: dialog_visible[0])
+)
+
+freq = 12
+
+status_control = FormattedTextControl(text=f"{format_statustime(datetime.now(), freq)}")
+status_window = Window(content=status_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.LEFT)
+
+page_control = FormattedTextControl(text="")
+page_window = Window(content=page_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.CENTER)
+
+right_control = FormattedTextControl(text="")
+right_window = Window(content=right_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.RIGHT)
+right_control.text = "forecast"
+
+
+def set_pages(txt: str):
+    page_control.text = f"{txt} "
+
+
+status_area = VSplit(
+    [
+        status_window,
+        page_window,
+        right_window
+    ],
+    height=1,
+)
+
+
+def get_row_col():
+    row_number = display_area.document.cursor_position_row
+    col_number = display_area.document.cursor_position_col
+    return row_number, col_number
+
+def get_tracker_from_row()->int:
+    row = display_area.document.cursor_position_row
+    page = tracker_manager.active_page
+    id = tracker_manager.row_to_id.get((page, row), None)
+    logger.debug(f"{page = }, {row = } => {id = }")
+    if id is not None:
+        tracker = tracker_manager.get_tracker_from_id(id)
+    else:
+        tracker = None
+    return tracker
+
+def read_readme():
+    try:
+        with open("README.md", "r") as file:
+            return file.read()
+    except FileNotFoundError:
+        return "README.md file not found."
+
+body = HSplit([
+    # menu_container,
+    display_area,
+    search_field,
+    status_area,
+    dialog_container,  # Conditional Input Area
+])
+
 kb = KeyBindings()
+
+@kb.add('f1')
+def menu(event=None):
+    """Focus menu."""
+    if event:
+        if app.layout.has_focus(root_container.window):
+            focus_previous(event)
+            # app.layout.focus(root_container.body)
+        else:
+            app.layout.focus(root_container.window)
+
+@kb.add('f2')
+def do_about(*event):
+    display_message('about track ...')
+
+@kb.add('f3')
+def do_check_updates(*event):
+    display_message('update info ...')
+
+@kb.add('f5', filter=Condition(lambda: menu_mode[0]))
+def refresh_info(*event):
+    tracker_manager.refresh_info()
+    list_trackers()
+
+@kb.add('right', filter=Condition(lambda: menu_mode[0]))
+def next_page(*event):
+
+    logger.debug("next page")
+    tracker_manager.next_page()
+    list_trackers()
+
+@kb.add('left', filter=Condition(lambda: menu_mode[0]))
+def previous_page(*event):
+    logger.debug("previous page")
+    tracker_manager.previous_page()
+    list_trackers()
+
+@kb.add('space', filter=Condition(lambda: menu_mode[0]))
+def first_page(*event):
+    logger.debug("first page")
+    tracker_manager.first_page()
+    list_trackers()
+
+@kb.add('f6')
+def do_restore_defaults(*event):
+    tracker_manager.restore_defaults()
+    display_message("Defaults restored.", 'info')
+
+@kb.add('f7')
+def do_help(*event):
+    help_text = read_readme()
+    display_message(wrap(help_text, 0), 'help')
+
+@kb.add('c-q')
+def exit_app(*event):
+    """Exit the application."""
+    app.exit()
+
+def display_message(message: str, document_type: str = 'list'):
+    """Log messages to the text area."""
+    set_lexer(document_type)
+    display_area.text = message
+    message_control.text = ""
+    app.invalidate()  # Refresh the UI
+
+@kb.add('l', filter=Condition(lambda: menu_mode[0]))
+def list_trackers(*event):
+    """List trackers."""
+    action[0] = "list"
+    set_mode('menu')
+    display_message(tracker_manager.list_trackers(), 'list')
+    app.layout.focus(display_area)
+    app.invalidate()
+
+@kb.add('l', filter=Condition(lambda: menu_mode[0]))
+def list_trackers(*event):
+    """List trackers."""
+    action[0] = "list"
+    set_mode('menu')
+    display_message(tracker_manager.list_trackers(), 'list')
+    app.layout.focus(display_area)
+    app.invalidate()
+
+@kb.add('t', filter=Condition(lambda: menu_mode[0]))
+def select_tag(*event):
+    """
+    From a keypress corresponding to a tag, move the cursor to the row corresponding to the tag and set the selected_id to the id of the corresponding tracker.
+    """
+    global done_keys, selected_id
+    done_keys = [x[1] for x in tracker_manager.tag_to_row.keys() if x[0] == tracker_manager.active_page]
+    message_control.text = wrap(f" {tag_msg} you would like to select", 0)
+    set_mode('select')
+
+    for key in tag_keys:
+        kb.add(key, filter=Condition(lambda: select_mode[0]), eager=True)(lambda event, key=key: handle_key_press(event, key))
+
+    def handle_key_press(event, key):
+        key_pressed = event.key_sequence[0].key
+        logger.debug(f"{tracker_manager.tag_to_row = }")
+        if key_pressed in done_keys:
+            set_mode('menu')
+            message_control.text = ""
+            if key_pressed == 'escape':
+                return
+
+            tag = (tracker_manager.active_page, key_pressed)
+            selected_id = tracker_manager.tag_to_id.get(tag)
+            row = tracker_manager.tag_to_row.get(tag)
+            logger.debug(f"got id {selected_id} and row {row} from tag {key_pressed}")
+            display_area.buffer.cursor_position = (
+                display_area.buffer.document.translate_row_col_to_index(row, 0)
+            )
+
+def close_dialog(*event):
+    action[0] = ""
+    message_control.text = ""
+    input_area.text = ""
+    menu_mode[0] = True
+    dialog_visible[0] = False
+    input_visible[0] = False
+    app.layout.focus(display_area)
+
+@kb.add('c-e')
+def add_example_trackers(*event):
+    import lorem
+    from lorem.text import TextLorem
+    lm = TextLorem(srange=(2,3))
+    import random
+    today = datetime.now().replace(microsecond=0,second=0,minute=0,hour=0)
+    for i in range(1,49): # create 48 trackers
+        name = f"# {lm.sentence()[:-1]}"
+        doc_id = 1000 + i # make sure id's don't conflict with existing trackers
+        tracker = Tracker(name, doc_id)
+        # Add the tracker to the trackers dictionary
+        tracker_manager.trackers[doc_id] = tracker
+        # doc_id =tracker_manager.add_tracker(f"# {lm.sentence()[:-1]}") # remove period at end and record for doc_id i+1
+        num_completions = random.choice(range(0,9,2))
+        days = random.choice(range(1,12))
+        offset = timedelta(minutes=-720*days)
+        for j in range(num_completions):
+            minutes = random.choice(range(-144,144, 12))*days
+            offset += timedelta(minutes=days*1440+minutes)
+            comp = today - offset
+            tracker_manager.trackers[doc_id].record_completion(comp)
+            tracker_manager.save_data()
+        tracker_manager.trackers[doc_id].compute_info()
+    list_trackers()
+
+@kb.add('c-r')
+def del_example_trackers(*event):
+    remove = []
+    for id, tracker in tracker_manager.trackers.items():
+        if tracker.name.startswith('#'):
+            remove.append(id)
+    for id in remove:
+        tracker_manager.delete_tracker(id)
+    list_trackers()
+
+
+def rename_tracker(*event):
+    action[0] = "rename"
+    menu_mode[0] = False
+    select_mode[0] = True
+    dialog_visible[0] = True
+    input_visible[0] = False
+    message_control.text = wrap(f" {tag_msg} you would like to rename", 0)
+
+
+root_container = MenuContainer(
+    body=body,
+    menu_items=[
+        MenuItem(
+            'track',
+            children=[
+                MenuItem('F1) toggle menu', handler=menu),
+                MenuItem('F2) about track', handler=do_about),
+                MenuItem('F3) check for updates', handler=do_check_updates),
+                MenuItem('F4) edit settings', handler=lambda: dialog_settings.start_dialog(None)),
+                MenuItem('F5) refresh info', handler=refresh_info),
+                MenuItem('F6) restore default settings', handler=do_restore_defaults),
+                MenuItem('F7) help', handler=do_help),
+                MenuItem('^q) quit', handler=exit_app),
+            ]
+        ),
+        MenuItem(
+            'view',
+            children=[
+                MenuItem('i) inspect tracker', handler=lambda: dialog_inspect.start_dialog(None)),
+                MenuItem('l) list trackers', handler=list_trackers),
+                MenuItem('s) sort trackers', handler=lambda: dialog_sort.start_dialog(None)),
+                MenuItem('t) select row from tag', handler=select_tag),
+            ]
+        ),
+        MenuItem(
+            'edit',
+            children=[
+                MenuItem('n) create new tracker', handler=lambda: dialog_new.start_dialog(None)),
+                MenuItem('c) add completion', handler=lambda: dialog_complete.start_dialog(None)),
+                MenuItem('d) delete tracker', handler=lambda: dialog_delete.start_dialog(None)),
+                MenuItem('e) edit history', handler=lambda: dialog_edit.start_dialog(None)),
+                MenuItem('r) rename tracker', handler=lambda: dialog_rename.start_dialog(None)),
+            ]
+        ),
+    ]
+)
+
 
 def set_mode(mode: str):
     if mode == 'menu':
@@ -1031,83 +1931,67 @@ dialog_sort = Dialog("sort", kb, tracker_manager, message_control, display_area,
 kb.add('s', filter=Condition(lambda: menu_mode[0]))(dialog_sort.start_dialog)
 
 
-def process_arguments():
-    """
-    Process sys.argv to get the necessary parameters, like the database file location.
-    """
-    backup_count = 7
+layout = Layout(root_container)
+# app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
 
-    if len(sys.argv) > 1:
-        try:
-            log_level = int(sys.argv[1])
-            sys.argv.pop(1)
-        except ValueError:
-            print(f"Invalid log level: {sys.argv[1]}. Using default INFO level.")
-            log_level = logging.INFO
+app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
 
-    envhome = os.environ.get('TRFHOME')
-    if len(sys.argv) > 1:
-        trf_home = sys.argv[1]
-    elif envhome:
-        trf_home = envhome
-    else:
-        trf_home = os.getcwd()
+app.layout.focus(root_container.body)
 
-    restore = len(sys.argv) > 2 and sys.argv[2] == 'restore'
+for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_settings]:
+    dialog.set_app(app)
 
-    return trf_home, log_level, restore
+status_control = FormattedTextControl(text=f"{format_statustime(datetime.now(), freq)}")
+status_window = Window(content=status_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.LEFT)
 
-def run_app(db_root):
-    """
-    Run the prompt_toolkit full-screen app.
-    """
-    textarea = TextArea(text="Welcome to the tracker app! Press Ctrl-C to exit.")
+page_control = FormattedTextControl(text="")
+page_window = Window(content=page_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.CENTER)
 
-    # Wrap the TextArea in a Layout
-    layout = Layout(container=textarea)
+right_control = FormattedTextControl(text="")
+right_window = Window(content=right_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.RIGHT)
+right_control.text = 'forecast'
 
-    # Create key bindings
-    kb = KeyBindings()
 
-    # Bind Ctrl-C to exit the application
-    @kb.add('c-c')
-    def _(event):
-        event.app.exit()  # Exits the application
+def set_pages(txt: str):
+    page_control.text = f"{txt} "
 
-    # Create the Application with the correct layout and key bindings
-    app = Application(layout=layout, full_screen=True, key_bindings=kb)
 
-    # Access the database root and interact with it here...
-    print(f"Database contains: {db_root.keys()}")  # Example of accessing the db root
+status_area = VSplit(
+    [
+        status_window,
+        page_window,
+        right_window
+    ],
+    height=1,
+)
 
-    # Run the application
-    app.run()
+layout = Layout(root_container)
+# app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
 
+app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
+
+app.layout.focus(root_container.body)
 
 def main():
-    global logger
-
-    # Get command-line arguments: Process the command-line arguments to get the database file location
-    trf_home, log_level, restore = process_arguments()
-
-    # Set up logging
-    logger = setup_logging(trf_home=trf_home, log_level=log_level)
-
-    # Initialize the ZODB database
-
-    db_file = os.path.join(trf_home, "trf.fs")
-
-    db, connection, db_root, transaction = init_db(db_file)
-
-    # initialize the tracker manager as a singleton instance
-    TrackerManager(db, connection, root, transaction)
-
+    # global tracker_manager
     try:
-        # Step 3: Run the prompt_toolkit app
-        run_app(db_root)
+        logger.info(f"Started TrackerManager with database file {db_path}")
+        display_text = tracker_manager.list_trackers()
+        display_message(display_text)
+        start_periodic_checks()  # Start the periodic checks
+        app.run()
+    except Exception as e:
+        logger.error(f"exception raised:\n{e}")
+    else:
+        logger.error("exited tracker")
     finally:
-        # Step 4: Close the database connection when the app exits
-        close_db(db, connection)
+        if tracker_manager:
+            tracker_manager.close()
+            logger.info(f"Closed TrackerManager and database file {db_path}")
+        else:
+            logger.info("TrackerManager was not initialized")
+            print("")
 
 if __name__ == "__main__":
+    print("in __name__ == __main__ calling main()")
     main()

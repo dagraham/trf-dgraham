@@ -2,12 +2,17 @@ import os
 import zipfile
 import re
 from datetime import datetime, timedelta
+from . import logger
 
 # Backup and restore functions
 
 def backup_to_zip(trf_home, today):
     backup_dir = os.path.join(trf_home, 'backup')
     files_to_backup = [os.path.join(trf_home, 'trf.fs'), os.path.join(trf_home, 'trf.fs.index')]
+    logger.debug(f"{files_to_backup = }")
+    if not files_to_backup or not os.path.exists(files_to_backup[0]):
+        return False, "nothing to backup"
+
     last_modified_timestamp = os.path.getmtime(files_to_backup[0])
     last_modified_time = datetime.fromtimestamp(last_modified_timestamp)
 
@@ -44,6 +49,7 @@ def rotate_backups(trf_home):
     ok, msg = backup_to_zip(trf_home, today)
     if not ok:
         logger.info(msg)
+        return False
 
     pattern = re.compile(r'^\d{6}\.zip$')
     all_files = os.listdir(backup_dir)
@@ -103,7 +109,7 @@ Choosing one of the 'restore from' options will:
         if choice in restore_options:
             if choice == '0':
                 print("Restore cancelled.")
-                return
+                return False, "nothing to backup"
 
             # Perform the restore
             ok, msg = backup_to_zip(track_home, 'remove')
