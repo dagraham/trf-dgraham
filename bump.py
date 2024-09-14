@@ -3,7 +3,7 @@
 from datetime import datetime
 import sys
 import subprocess   # for check_output
-from trf.__version__ import version
+from __version__ import version
 
 def check_output(cmd):
     if not cmd:
@@ -68,7 +68,7 @@ if ext and ext in extension_options:
 
 import os
 
-version_file = os.path.join(os.getcwd(), 'trf', '__version__.py')
+version_file = os.path.join(os.getcwd(), '__version__.py')
 
 print('\n'.join(opts))
 res = input(f'Which new version? ')
