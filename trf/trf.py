@@ -1273,6 +1273,12 @@ input_area = TextArea(
 
 dynamic_input_area = DynamicContainer(lambda: input_area)
 
+menu_mode = [True]
+select_mode = [False]
+bool_mode = [False]
+integer_mode = [False]
+character_mode = [False]
+input_mode = [False]
 dialog_visible = [False]
 input_visible = [False]
 action = [None]
@@ -1291,7 +1297,6 @@ message_window = DynamicContainer(
         style="class:message-window"
     )
 )
-
 
 dialog_area = HSplit(
         [
@@ -1639,6 +1644,7 @@ class Dialog:
         self.app = None  # Initialize without app
 
     def set_app(self, app):
+        logger.debug(f"setting app for dialog {self.action_type}")
         self.app = app
 
     def set_done_keys(self, done_keys: list[str]):
@@ -1684,10 +1690,6 @@ class Dialog:
             # put the formatted completions in the input area
             input_area.text = wrap(tracker.format_history(), 0)
             self.app.layout.focus(input_area)
-            logger.debug(f"{self.app.layout.current_window = }")
-            logger.debug(f"{self.app.layout.current_buffer = }")
-            logger.debug(f"{self.app.layout.buffer_has_focus = }")
-            logger.debug(f"{self.app.layout.current_buffer.cursor_position = }")  # input_area.buffer.cursor_position
             input_area.accept_handler = lambda buffer: self.handle_history()
             self.kb.add('enter')(self.handle_history)
             self.kb.add('c-c', eager=True)(self.handle_cancel)
@@ -1932,21 +1934,6 @@ kb.add('d', filter=Condition(lambda: menu_mode[0]))(dialog_delete.start_dialog)
 dialog_sort = Dialog("sort", kb, tracker_manager, message_control, display_area, wrap)
 kb.add('s', filter=Condition(lambda: menu_mode[0]))(dialog_sort.start_dialog)
 
-
-layout = Layout(root_container)
-# app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
-
-# app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
-app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
-
-app.layout.focus(root_container.body)
-
-logger.debug(f"{layout = }, {app = }")
-
-for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_settings]:
-    dialog.set_app(app)
-
-
 def set_pages(txt: str):
     page_control.text = f"{txt} "
 
@@ -1965,6 +1952,9 @@ layout = Layout(root_container)
 app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
 
 app.layout.focus(root_container.body)
+
+for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_settings]:
+    dialog.set_app(app)
 
 def main():
     try:
