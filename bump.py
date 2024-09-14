@@ -68,7 +68,7 @@ if ext and ext in extension_options:
 
 import os
 
-version_file = os.path.join(os.getcwd(), '__version__.py')
+version_file = os.path.join(os.getcwd(), 'trf', ' '__version__.py')
 
 print('\n'.join(opts))
 res = input(f'Which new version? ')
