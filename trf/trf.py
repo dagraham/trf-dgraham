@@ -1314,9 +1314,8 @@ status_window = Window(content=status_control, height=1, style="class:status-win
 page_control = FormattedTextControl(text="")
 page_window = Window(content=page_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.CENTER)
 
-right_control = FormattedTextControl(text="")
+right_control = FormattedTextControl(text=f"{tracker_manager.sort_by} ")
 right_window = Window(content=right_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.RIGHT)
-right_control.text = "forecast"
 
 
 def set_pages(txt: str):
@@ -1570,7 +1569,6 @@ root_container = MenuContainer(
         ),
     ]
 )
-
 
 def set_mode(mode: str):
     if mode == 'menu':
@@ -1941,16 +1939,6 @@ app.layout.focus(root_container.body)
 for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_settings]:
     dialog.set_app(app)
 
-status_control = FormattedTextControl(text=f"{format_statustime(datetime.now(), freq)}")
-status_window = Window(content=status_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.LEFT)
-
-page_control = FormattedTextControl(text="")
-page_window = Window(content=page_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.CENTER)
-
-right_control = FormattedTextControl(text="")
-right_window = Window(content=right_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.RIGHT)
-right_control.text = 'forecast'
-
 
 def set_pages(txt: str):
     page_control.text = f"{txt} "
@@ -1966,14 +1954,12 @@ status_area = VSplit(
 )
 
 layout = Layout(root_container)
-# app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
 
 app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
 
 app.layout.focus(root_container.body)
 
 def main():
-    # global tracker_manager
     try:
         logger.info(f"Started TrackerManager with database file {db_path}")
         display_text = tracker_manager.list_trackers()
