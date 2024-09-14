@@ -1,0 +1,4 @@
+Recent tagged changes as of 2024-09-14 15:38:33.517742:
+- 0 seconds ago (HEAD -> working, tag: 0.0.1) Daniel Graham
+    3d13d9f 2024-09-14 15:38:33 -0400
+    Tagged version 0.0.1. initial commit

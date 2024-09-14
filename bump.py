@@ -19,7 +19,7 @@ def check_output(cmd):
         )
         return True, res
     except subprocess.CalledProcessError as e:
-        logger.warning(f"Error running {cmd}\n'{e.output}'")
+        print(f"Error running {cmd}\n'{e.output}'")
         lines = e.output.strip().split('\n')
         msg = lines[-1]
         return False, msg
