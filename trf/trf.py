@@ -1684,6 +1684,10 @@ class Dialog:
             # put the formatted completions in the input area
             input_area.text = wrap(tracker.format_history(), 0)
             self.app.layout.focus(input_area)
+            logger.debug(f"{self.app.layout.current_window = }")
+            logger.debug(f"{self.app.layout.current_buffer = }")
+            logger.debug(f"{self.app.layout.buffer_has_focus = }")
+            logger.debug(f"{self.app.layout.current_buffer.cursor_position = }")  # input_area.buffer.cursor_position
             input_area.accept_handler = lambda buffer: self.handle_history()
             self.kb.add('enter')(self.handle_history)
             self.kb.add('c-c', eager=True)(self.handle_cancel)
@@ -1932,9 +1936,12 @@ kb.add('s', filter=Condition(lambda: menu_mode[0]))(dialog_sort.start_dialog)
 layout = Layout(root_container)
 # app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
 
-app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
+# app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style)
+app = Application(layout=layout, key_bindings=kb, full_screen=True, style=style)
 
 app.layout.focus(root_container.body)
+
+logger.debug(f"{layout = }, {app = }")
 
 for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_settings]:
     dialog.set_app(app)
