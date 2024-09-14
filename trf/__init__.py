@@ -12,6 +12,7 @@ def process_arguments():
     Process sys.argv to get the necessary parameters, like the database file location.
     """
     backup_count = 7
+    log_level = logging.INFO
 
     if len(sys.argv) > 1:
         try:

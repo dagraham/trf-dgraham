@@ -3,7 +3,7 @@
 from datetime import datetime
 import sys
 import subprocess   # for check_output
-from __version__ import version
+from trf.__version__ import version
 
 def check_output(cmd):
     if not cmd:

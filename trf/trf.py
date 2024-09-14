@@ -53,7 +53,7 @@ import logging
 # from ZODB import DB, FileStorage
 from persistent import Persistent
 
-import __version__ as version
+from .__version__ import version
 from . import trf_home, logger, backup_dir, db_path
 from . import storage, db, connection, root, transaction
 from .backup import backup_to_zip, rotate_backups, restore_from_zip
