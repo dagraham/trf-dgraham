@@ -32,7 +32,7 @@ setup(
         'persistent>=4.6.4',  # Add persistent here
         'ZODB>=5.6.0',  # Add ZODB here
         'transaction>=3.0.1',  # Add transaction here
-        'lorem>=0.1.5',
+        'lorem>=0.1.1',
     ],
     entry_points={
         'console_scripts': [
