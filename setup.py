@@ -7,7 +7,9 @@ def read_version():
         for line in f:
             if line.startswith("version"):
                 # Extract the version string
-                return line.split("=")[1].strip().strip('"')
+                return line.split("=")[1].strip().strip("'")
+
+print(f"{read_version = }")
 
 setup(
     name="trf-dgraham",  # Replace with your app's name
