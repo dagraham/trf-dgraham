@@ -12,7 +12,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/dagraham/trf-dgraham",  # Replace with the repo URL if applicable
     packages=find_packages(),
-    py_modules=["trf"],
+    # py_modules=["trf"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",  # Replace with your license
@@ -26,7 +26,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'trf=trf.trf:main',  # Correct the path to `main` in `trf/trf.py`
+            'trf=trf.__main__:main',  # Correct the path to `main` in `trf/trf.py`
         ],
     },
 )
