@@ -1,9 +1,10 @@
 # setup.py
 from setuptools import setup, find_packages
+from trf.__version__ import version
 
 setup(
     name="trf-dgraham",  # Replace with your app's name
-    version='0.0.1',
+    version=version,
     author="Daniel A Graham",  # Replace with your name
     author_email="dnlgrhm@gmail.com",  # Replace with your email
     description="This is a simple application for recording the sequence of occasions on which a task is completed and forecasting when the next completion might be needed.",

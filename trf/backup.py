@@ -2,11 +2,11 @@ import os
 import zipfile
 import re
 from datetime import datetime, timedelta
-from . import logger
+# from . import logger
 
 # Backup and restore functions
 
-def backup_to_zip(trf_home, today):
+def backup_to_zip(trf_home, today, logger):
     backup_dir = os.path.join(trf_home, 'backup')
     files_to_backup = [os.path.join(trf_home, 'trf.fs'), os.path.join(trf_home, 'trf.fs.index')]
     logger.debug(f"{files_to_backup = }")
@@ -40,13 +40,13 @@ def backup_to_zip(trf_home, today):
 
     return (True, f"Backup completed: {backup_zip}")
 
-def rotate_backups(trf_home):
+def rotate_backups(trf_home, logger):
     # entry point for backups - make sure backup dir exists
     backup_dir = os.path.join(trf_home, 'backup')
     os.makedirs(backup_dir, exist_ok=True)
 
     today = datetime.today()
-    ok, msg = backup_to_zip(trf_home, today)
+    ok, msg = backup_to_zip(trf_home, today, logger)
     if not ok:
         logger.info(msg)
         return False

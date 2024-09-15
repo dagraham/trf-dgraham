@@ -1,5 +1,7 @@
 # trf/trf.py
 from typing import List, Dict, Any, Callable, Mapping
+import logging
+from logging.handlers import TimedRotatingFileHandler
 from prompt_toolkit import Application
 from prompt_toolkit.layout import Layout
 from prompt_toolkit.layout.containers import (
@@ -54,12 +56,101 @@ import logging
 from persistent import Persistent
 
 from .__version__ import version
-from . import trf_home, logger, backup_dir, db_path
-from . import storage, db, connection, root, transaction
+
+from . import trf_home, log_level, restore, backup_dir, db_path
+
+# from . import storage, db, connection, root, transaction
+
 from .backup import backup_to_zip, rotate_backups, restore_from_zip
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+import ZODB, ZODB.FileStorage
+import transaction
+
+
+def setup_logging(trf_home, log_level=logging.INFO, backup_count=7):
+    """
+    Set up logging with daily rotation and a specified log level.
+
+    Args:
+        trf_home (str): The home directory for storing log files.
+        log_level (int): The log level (e.g., logging.DEBUG, logging.INFO).
+        backup_count (int): Number of backup log files to keep.
+    """
+    global db, connection, root, transaction
+    print("in setup_logging")
+    log_dir = os.path.join(trf_home, "logs")
+
+    # Ensure the logs directory exists
+    os.makedirs(log_dir, exist_ok=True)
+
+    logfile = os.path.join(log_dir, "trf.log")
+
+    # Create a TimedRotatingFileHandler for daily log rotation
+    handler = TimedRotatingFileHandler(
+        logfile, when="midnight", interval=1, backupCount=backup_count
+    )
+
+    # Set the suffix to add the date and ".log" extension to the rotated files
+    handler.suffix = "%y%m%d.log"
+
+    # Create a formatter
+    formatter = logging.Formatter(
+        fmt='--- %(asctime)s - %(levelname)s - %(module)s.%(funcName)s\n    %(message)s',
+        datefmt="%y-%m-%d %H:%M:%S"
+    )
+
+    # Set the formatter to the handler
+    handler.setFormatter(formatter)
+
+    # Define a custom namer function to change the log file naming format
+    def custom_namer(filename):
+        # Replace "tracker.log." with "tracker-" in the rotated log filename
+        return filename.replace("trf.log.", "trf")
+
+    # Set the handler's namer function
+    handler.namer = custom_namer
+
+    # Get the root logger
+    logger = logging.getLogger()
+    logger.setLevel(log_level)
+
+    # Clear any existing handlers (if needed)
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
+    # Add the TimedRotatingFileHandler to the logger
+    logger.addHandler(handler)
+
+    logger.info("Logging setup complete.")
+    logging.info(f"\n### Logging initialized at level {log_level} ###")
+
+    return logger
+
+# Set up logging
+logger = setup_logging(trf_home=trf_home, log_level=log_level)
+
+def init_db(db_path):
+    """
+    Initialize the ZODB database using the specified file.
+    """
+    print("in init_db")
+    storage = ZODB.FileStorage.FileStorage(db_path)
+    db = ZODB.DB(storage)
+    connection = db.open()
+    root = connection.root()
+    return storage, db, connection, root, transaction
+
+
+def close_db(db, connection):
+    """
+    Close the ZODB database and its connection.
+    """
+    connection.close()
+    db.close()
+
 
 def clear_screen():
     # For Windows
@@ -838,7 +929,10 @@ class TrackerManager:
         finally:
             self.connection.close()
 
+# Initialize the ZODB database
+storage, db, connection, root, transaction = init_db(db_path)
 # print(f"db: {db = }, {connection = }, {root = }, {transaction = }")
+
 tracker_manager = TrackerManager(storage, db, connection, root, transaction)
 print(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
 
@@ -1204,7 +1298,7 @@ def check_alarms():
         if newday != today:
             logger.debug(f"new day: {newday}")
             today = newday
-            rotate_backups(trf_home)
+            rotate_backups(trf_home, logger)
 
 def start_periodic_checks():
     """Start the periodic check for alarms in a separate thread."""
