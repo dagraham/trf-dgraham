@@ -2,9 +2,16 @@
 from setuptools import setup, find_packages
 from trf.__version__ import version
 
+def read_version():
+    with open("trf/__version__.py") as f:
+        for line in f:
+            if line.startswith("version"):
+                # Extract the version string
+                return line.split("=")[1].strip().strip('"')
+
 setup(
     name="trf-dgraham",  # Replace with your app's name
-    version=version,
+    version=read_version(),
     author="Daniel A Graham",  # Replace with your name
     author_email="dnlgrhm@gmail.com",  # Replace with your email
     description="This is a simple application for recording the sequence of occasions on which a task is completed and forecasting when the next completion might be needed.",
