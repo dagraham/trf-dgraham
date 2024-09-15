@@ -33,6 +33,7 @@ setup(
         'ZODB>=5.6.0',  # Add ZODB here
         'transaction>=3.0.1',  # Add transaction here
         'lorem>=0.1.1',
+        'pyperclip>=1.7.0',
     ],
     entry_points={
         'console_scripts': [

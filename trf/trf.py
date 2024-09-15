@@ -53,6 +53,7 @@ from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.layout import Layout
 import logging
 from persistent import Persistent
+import pyperclip
 
 import lorem
 from lorem.text import TextLorem
@@ -1508,6 +1509,13 @@ def exit_app(*event):
     """Exit the application."""
     app.exit()
 
+@kb.add('c-p')
+def save_to_clipboard(event):
+    # Access the content of the TextArea
+    if display_area.text:
+        pyperclip.copy(display_area.text)
+        display_message('display copied to system clipboard', 'info')
+
 def display_message(message: str, document_type: str = 'list'):
     """Log messages to the text area."""
     set_lexer(document_type)
@@ -1883,8 +1891,8 @@ class Dialog:
         logger.debug(f"got completion_str: '{completion_str}' for {self.selected_id}")
         if completion_str:
             ok, completions = Tracker.parse_completions(completion_str)
-            logger.debug(f"recording completion_dt: '{completion}' for {self.selected_id}")
-            self.tracker_manager.record_completions(self.selected_id, completion)
+            logger.debug(f"recording completion_dt: '{completions}' for {self.selected_id}")
+            self.tracker_manager.record_completions(self.selected_id, completions)
             close_dialog()
         else:
             self.display_area.text = "No completion datetime provided."
