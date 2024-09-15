@@ -1,6 +1,5 @@
 # setup.py
 from setuptools import setup, find_packages
-from trf.__version__ import version
 
 def read_version():
     with open("trf/__version__.py") as f:
