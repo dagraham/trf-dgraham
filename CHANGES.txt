@@ -1,29 +1,33 @@
-Recent tagged changes as of 2024-09-15 06:58:44.101839:
-- 0 seconds ago (HEAD -> working, tag: 0.0.7) Daniel Graham
+Recent tagged changes as of 2024-09-15 10:35:27.261027:
+- 0 seconds ago (HEAD -> working, tag: 0.0.8) Daniel Graham
+    15cf059 2024-09-15 10:35:27 -0400
+    Tagged version 0.0.8.
+
+- 4 hours ago (tag: 0.0.7) Daniel Graham
     ed42469 2024-09-15 06:58:44 -0400
     Tagged version 0.0.7.
 
-- 8 minutes ago (tag: 0.0.6) Daniel Graham
+- 4 hours ago (tag: 0.0.6) Daniel Graham
     826da26 2024-09-15 06:50:44 -0400
     Tagged version 0.0.6.
 
-- 22 minutes ago (tag: 0.0.5) Daniel Graham
+- 4 hours ago (tag: 0.0.5) Daniel Graham
     1c8cd22 2024-09-15 06:37:14 -0400
     Tagged version 0.0.5.
 
-- 54 minutes ago (tag: 0.0.4) Daniel Graham
+- 5 hours ago (tag: 0.0.4) Daniel Graham
     923ecfd 2024-09-15 06:04:59 -0400
     Tagged version 0.0.4.
 
-- 8 hours ago (tag: 0.0.3) Daniel Graham
+- 12 hours ago (tag: 0.0.3) Daniel Graham
     0b39fd4 2024-09-14 22:58:46 -0400
     Tagged version 0.0.3. refactored __init__.py only to
     process_arguments
 
-- 15 hours ago (tag: 0.0.2) Daniel Graham
+- 18 hours ago (tag: 0.0.2) Daniel Graham
     387eb5f 2024-09-14 16:19:54 -0400
     Tagged version 0.0.2.
 
-- 15 hours ago (tag: 0.0.1) Daniel Graham
+- 19 hours ago (tag: 0.0.1) Daniel Graham
     3d13d9f 2024-09-14 15:38:33 -0400
     Tagged version 0.0.1. initial commit
