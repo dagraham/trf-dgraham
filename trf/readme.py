@@ -1,4 +1,6 @@
+# trf/readme.py
 
+readme_template = """
 # trf: tracker record and forecast
 
 This is a simple application for tracking the sequence of occasions on which a task is completed and predicting when the next completion might be needed.
@@ -28,7 +30,7 @@ The recorded history of completions is thus a list of (datetime, timedelta=0m) p
 
 Here is a part of a screenshot from the "inspect" display for the "fill bird feeders" tracker showing a history of four completions together with the corresponding three intervals and other related calculations:
 
-![inspect view](tracker_inspect.png)
+{inspect}
 
 Note that the first interval, `8 days 1 hour`, is the difference between `240808T1400 + 1 day` and `240808T1300`.  The other intervals are computed in the same way. The `average` interval is just the sum of the three intervals divided by 3. The little upward pointing arrow after the average interval indicates that, since the last interval is greater than the average, the average is increasing.
 
@@ -45,7 +47,7 @@ where, by default, `η = 2`. With these settings at least 75% of the intervals w
 
 The list view reflects theses calculations:
 
-![list view](tracker_list.png)
+{list}
 
 Since it is currently 12:16pm on September 9 and this is past `late` for the bird feeders, the display shows the bird feeder tracker in a suspiciously-late color, burnt orange. By comparison, `early` and `late` datetimes for "between early and late" are September 9 minus or plus 2 days.  Since the current time lies within this interval, "between early and late" gets an anytime-now color, gold. Finally, since `early` for "before early" is 12pm September 12 which is past the current time, "before early" gets a not-yet color, blue. There is no forecast for the last two trackers since neither have the two or more completions which arerequired for an interval on which to base a forecast, so these get trackers get the the no-forecast color, white.
 
@@ -102,4 +104,48 @@ Finally, if neither home_dir nor TRACKHOME is given, then track will use the cur
 
 If 'restore' is given, then a list of the available backup zip files in the 'backup' sub directory of the home dir will be presented to the user with a prompt to choose the zip file from which to restore the datastore. If the user chooses a zip file, the current 'track.fs' and 'track.fs.index' files will first be saved as 'restore.zip' and then overwritten with the contents of the selected zip file. The next time track is started it will use the restored datastore.
 
-In addition to the 'backup' subdirectory mentioned above, track keeps a daily rotating backup of its log files in a another subdirectory called 'logs'.
+In addition to the 'backup' subdirectory mentioned above, track keeps a daily rotating backup of its log files in a another subdirectory called 'logs'."""
+
+
+# Define replacements for image links or text alternatives
+image_replacements = {
+    "inspect": "![inspect view](tracker_inspect.png)",
+    "list": "![list view](tracker_list.png)",
+}
+
+text_replacements = {
+    "inspect": """\
+    name:         fill bird feeders
+    doc_id:       1
+    created:      240915T1232
+    modified:     240915T1238
+    completions:  (3)
+        240813T1400 +0m, 240824T1400 +0m, 240902T1000 +0m
+    intervals:    (2)
+        +11d, +8d20h
+        average:  9d22h↓
+        spread:   1d2h
+    forecast:     240912T0800
+        early:    240910T0400
+        late:     240914T1200
+""",
+    "list": """\
+    ‌tag  forecast  η spread   latest    name
+    a    24-09-12  2d4h      24-09-02   fill bird feeders
+    b    24-09-17  3d1h30m   24-09-10   between early and late
+    c    24-09-18  1d20h     24-09-11   before early
+    d       ~         ~      24-09-08   only one completion
+    e       ~         ~          ~      no completions yet
+"""
+}
+
+def generate_readme():
+    with open("README.md", "w") as f:
+        f.write(readme_template.format(**image_replacements))
+    with open("README.txt", "w") as f:
+        f.write(readme_template.format(**text_replacements))
+
+
+if __name__ == "__main__":
+    print("generating README.md and README.txt")
+    generate_readme()
