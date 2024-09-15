@@ -26,11 +26,15 @@ setup(
         "License :: OSI Approved :: MIT License",  # Replace with your license
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7.3",  # Specify the minimum Python version
+    python_requires=">=3.9.0",  # Specify the minimum Python version
     install_requires=[
         'prompt-toolkit>=3.0.24',
         'ruamel.yaml>=0.15.88',
         'python-dateutil>=2.7.3',
+        'persistent>=4.6.4',  # Add persistent here
+        'ZODB>=5.6.0',  # Add ZODB here
+        'transaction>=3.0.1',  # Add transaction here
+        'lorem>=0.1.5',
     ],
     entry_points={
         'console_scripts': [

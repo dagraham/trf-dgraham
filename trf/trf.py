@@ -52,8 +52,10 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.layout import Layout
 import logging
-# from ZODB import DB, FileStorage
 from persistent import Persistent
+
+import lorem
+from lorem.text import TextLorem
 
 from .__version__ import version
 
@@ -80,7 +82,6 @@ def setup_logging(trf_home, log_level=logging.INFO, backup_count=7):
         backup_count (int): Number of backup log files to keep.
     """
     global db, connection, root, transaction
-    print("in setup_logging")
     log_dir = os.path.join(trf_home, "logs")
 
     # Ensure the logs directory exists
@@ -136,7 +137,6 @@ def init_db(db_path):
     """
     Initialize the ZODB database using the specified file.
     """
-    print("in init_db")
     storage = ZODB.FileStorage.FileStorage(db_path)
     db = ZODB.DB(storage)
     connection = db.open()
@@ -608,17 +608,14 @@ class Tracker(Persistent):
             if choice == 0:
                 return
             if choice < 1 or choice > len(self.history):
-                print("Invalid choice.")
                 return
             selected_comp = self.history[choice - 1]
-            print(f"Selected completion: {self.format_completion(selected_comp)}")
 
             # Choose what to do with the selected entry
             action = input("Do you want to (d)elete or (r)eplace this entry? ").strip().lower()
 
             if action == 'd':
                 self.history.pop(choice - 1)
-                print("Entry deleted.")
             elif action == 'r':
                 new_comp_str = input("Enter the replacement completion: ").strip()
                 ok, new_comp = self.parse_completion(new_comp_str)
@@ -642,7 +639,7 @@ class Tracker(Persistent):
             self._p_changed = True
 
         except ValueError:
-            print("Invalid input. Please enter a number.")
+            logger.error("Invalid input. Please enter a number.")
 
     def get_tracker_info(self):
 
@@ -683,8 +680,6 @@ def page_banner(active_page_num: int, number_of_pages: int):
 class TrackerManager:
 
     def __init__(self, storage, db, connection, root, transaction) -> None:
-        print(f"in TrackerManager.init: {storage = }, {db = }, {connection = }, {root = }, {transaction = }")
-
         # Ensure that all required arguments are provided during the first initialization
         if db is None or connection is None or root is None or transaction is None:
             raise ValueError("db, connection, root, and transaction must be provided on the first initialization.")
@@ -739,7 +734,7 @@ class TrackerManager:
             self.zodb_root[0] = self.settings  # Update the ZODB storage
             self.transaction.commit()
         else:
-            print(f"Setting '{key}' not found.")
+            logger.error(f"Setting '{key}' not found.")
 
     def get_setting(self, key):
         return self.settings.get(key, None)
@@ -913,7 +908,6 @@ class TrackerManager:
 
     def close(self):
         # Make sure to commit or abort any ongoing transaction
-        print()
         try:
             if self.connection.transaction_manager.isDoomed():
                 logger.error("Transaction aborted.")
@@ -931,10 +925,9 @@ class TrackerManager:
 
 # Initialize the ZODB database
 storage, db, connection, root, transaction = init_db(db_path)
-# print(f"db: {db = }, {connection = }, {root = }, {transaction = }")
 
 tracker_manager = TrackerManager(storage, db, connection, root, transaction)
-print(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
+logger.debug(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
 
 
 tag_msg = "Press the key corresponding to the tag of the tracker"
@@ -1239,13 +1232,6 @@ class TrackerLexer(Lexer):
     def _parse_date(date_str):
         return datetime.strptime(date_str, "%y-%m-%d")
 
-
-# def get_tracker_manager():
-#     # Return the singleton instance
-#     return TrackerManager()
-
-# tracker_manager = TrackerManager()
-# print(f"tracker_manager: {tracker_manager.__dict__ = }")
 
 def format_statustime(obj, freq: int = 0):
     width = shutil.get_terminal_size()[0]
@@ -1588,8 +1574,6 @@ def close_dialog(*event):
 
 @kb.add('c-e')
 def add_example_trackers(*event):
-    import lorem
-    from lorem.text import TextLorem
     lm = TextLorem(srange=(2,3))
     import random
     today = datetime.now().replace(microsecond=0,second=0,minute=0,hour=0)
@@ -2068,8 +2052,6 @@ def main():
             logger.info(f"Closed TrackerManager and database file {db_path}")
         else:
             logger.info("TrackerManager was not initialized")
-            print("")
 
 if __name__ == "__main__":
-    print("in __name__ == __main__ calling main()")
     main()

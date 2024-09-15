@@ -12,7 +12,6 @@ def process_arguments():
             log_level = int(sys.argv[1])
             sys.argv.pop(1)
         except ValueError:
-            print(f"Invalid log level: {sys.argv[1]}. Using default INFO level.")
             log_level = log_level
 
     envhome = os.environ.get('TRFHOME')
