@@ -8,8 +8,6 @@ def read_version():
                 # Extract the version string
                 return line.split("=")[1].strip().strip("'")
 
-print(f"{read_version = }")
-
 setup(
     name="trf-dgraham",  # Replace with your app's name
     version=read_version(),

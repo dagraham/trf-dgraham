@@ -1524,15 +1524,6 @@ def list_trackers(*event):
     app.layout.focus(display_area)
     app.invalidate()
 
-@kb.add('l', filter=Condition(lambda: menu_mode[0]))
-def list_trackers(*event):
-    """List trackers."""
-    action[0] = "list"
-    set_mode('menu')
-    display_message(tracker_manager.list_trackers(), 'list')
-    app.layout.focus(display_area)
-    app.invalidate()
-
 @kb.add('t', filter=Condition(lambda: menu_mode[0]))
 def select_tag(*event):
     """
