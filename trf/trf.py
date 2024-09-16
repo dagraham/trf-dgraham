@@ -593,6 +593,13 @@ class Tracker(Persistent):
         self._p_changed = True
         return True, f"recorded completions for ..."
 
+    def remove_completions(self):
+        self.history = []
+        self.invalidate_info()
+        self.modified = datetime.now()
+        self._p_changed = True
+        return True, f"removed all completions for ..."
+
 
     def edit_history(self):
         if not self.history:
@@ -651,9 +658,9 @@ class Tracker(Persistent):
         # insert a placeholder to prevent date and time from being split across multiple lines when wrapping
         # format_str = f"%y-%m-%d{PLACEHOLDER}%H:%M"
         logger.debug(f"{self.history = }")
-        history = [f"{Tracker.format_dt(x[0])} {Tracker.format_td(x[1])}" for x in self.history]
+        history = [f"{Tracker.format_dt(x[0])} {Tracker.format_td(x[1])}" for x in self.history] if self.history else []
         history = ', '.join(history)
-        intervals = [f"{Tracker.format_td(x)}" for x in self._info['intervals']]
+        intervals = [f"{Tracker.format_td(x)}" for x in self._info['intervals']] if self._info.get('intervals') else []
         intervals = ', '.join(intervals)
         return wrap(f"""\
  name:        {self.name}
@@ -770,6 +777,15 @@ class TrackerManager:
             display_message(msg, 'error')
             return
         display_message(f"{self.trackers[doc_id].get_tracker_info()}", 'info')
+
+    def remove_completions(self, doc_id: int):
+        ok, msg = self.trackers[doc_id].remove_completions()
+        if not ok:
+            display_message(msg, 'error')
+            return
+        display_message(f"{self.trackers[doc_id].get_tracker_info()}", 'info')
+
+
 
 
     def get_tracker_data(self, doc_id: int = None):
@@ -1500,6 +1516,13 @@ def do_restore_defaults(*event):
     display_message("Defaults restored.", 'info')
 
 @kb.add('f7')
+def save_to_clipboard(*event):
+    # Access the content of the TextArea
+    if display_area.text:
+        pyperclip.copy(display_area.text)
+        display_message('display copied to system clipboard', 'info')
+
+@kb.add('f8')
 def do_help(*event):
     help_text = read_readme()
     display_message(wrap(help_text, 0), 'help')
@@ -1508,13 +1531,6 @@ def do_help(*event):
 def exit_app(*event):
     """Exit the application."""
     app.exit()
-
-@kb.add('c-p')
-def save_to_clipboard(event):
-    # Access the content of the TextArea
-    if display_area.text:
-        pyperclip.copy(display_area.text)
-        display_message('display copied to system clipboard', 'info')
 
 def display_message(message: str, document_type: str = 'list'):
     """Log messages to the text area."""
@@ -1562,14 +1578,14 @@ def select_tag(*event):
                 display_area.buffer.document.translate_row_col_to_index(row, 0)
             )
 
-def close_dialog(*event):
-    action[0] = ""
-    message_control.text = ""
-    input_area.text = ""
-    menu_mode[0] = True
-    dialog_visible[0] = False
-    input_visible[0] = False
-    app.layout.focus(display_area)
+# def close_dialog(*event):
+#     action[0] = ""
+#     message_control.text = ""
+#     input_area.text = ""
+#     menu_mode[0] = True
+#     dialog_visible[0] = False
+#     input_visible[0] = False
+#     app.layout.focus(display_area)
 
 @kb.add('c-e')
 def add_example_trackers(*event):
@@ -1627,7 +1643,8 @@ root_container = MenuContainer(
                 MenuItem('F4) edit settings', handler=lambda: dialog_settings.start_dialog(None)),
                 MenuItem('F5) refresh info', handler=refresh_info),
                 MenuItem('F6) restore default settings', handler=do_restore_defaults),
-                MenuItem('F7) help', handler=do_help),
+                MenuItem('F7) copy display to clipboard', handler=save_to_clipboard),
+                MenuItem('F8) help', handler=do_help),
                 MenuItem('^q) quit', handler=exit_app),
             ]
         ),
@@ -1713,6 +1730,7 @@ class Dialog:
     def __init__(self, action_type, kb, tracker_manager, message_control, display_area, wrap):
         self.action_type = action_type
         self.kb = kb
+        self.reset_kb = kb
         self.menu_mode = menu_mode
         self.select_mode = select_mode
         self.tracker_manager = tracker_manager
@@ -1753,6 +1771,19 @@ class Dialog:
         elif self.action_type == "sort":
             self.set_sort_mode(None)
 
+    def close_dialog(self, *event):
+        # reset 'enter' and 'c-c' keys by replacing their bindings
+        self.kb.add('enter')(self.do_nothing)
+        self.kb.add('c-c', eager=True)(self.do_nothing)
+        action[0] = ""
+        message_control.text = ""
+        input_area.text = ""
+        set_mode('menu')
+        # menu_mode[0] = True
+        # dialog_visible[0] = False
+        # input_visible[0] = False
+        app.layout.focus(display_area)
+
 
     def set_input_mode(self, tracker):
         set_mode('input')
@@ -1764,7 +1795,7 @@ class Dialog:
             self.kb.add('c-c', eager=True)(self.handle_cancel)
 
         elif self.action_type == "edit":
-            self.message_control.text = wrap(f' Edit the completion datetimes for "{tracker.name}" (doc_id {self.selected_id})\n Press "enter" to save changes or "^c" to cancel', 0)
+            self.message_control.text = wrap(f' Enter the completion datetimes for "{tracker.name}" (doc_id {self.selected_id})\n or just the single word "remove" to delete any existing completions.\n Press "enter" to save changes or "^c" to cancel', 0)
             # put the formatted completions in the input area
             input_area.text = wrap(tracker.format_history(), 0)
             self.app.layout.focus(input_area)
@@ -1863,9 +1894,10 @@ class Dialog:
             if ok:
                 logger.debug(f"recording completion_dt: '{completion}' for {self.selected_id}")
                 self.tracker_manager.record_completion(self.selected_id, completion)
-                close_dialog()
+                self.close_dialog()
         else:
             self.display_area.text = "No completion datetime provided."
+            self.close_dialog()
         set_mode('menu')
         self.app.layout.focus(self.display_area)
 
@@ -1873,16 +1905,25 @@ class Dialog:
         history = input_area.text.strip()
         logger.debug(f"got history: '{history}' for {self.selected_id}")
         if history:
-            ok, completions = Tracker.parse_completions(history)
-            if ok:
-                logger.debug(f"recording '{completions}' for {self.selected_id}")
-                self.tracker_manager.record_completions(self.selected_id, completions)
-                close_dialog()
+            logger.debug(f"got history: '{history}' for {self.selected_id}")
+            if history == 'remove':
+                logger.debug(f"removing all completions for {self.selected_id}")
+                self.tracker_manager.remove_completions(self.selected_id)
+                self.close_dialog()
+                set_mode('menu')
             else:
-                display_message(f"Invalid history: '{completions}'", 'error')
-
+                ok, completions = Tracker.parse_completions(history)
+                if ok:
+                    logger.debug(f"recording '{completions}' for {self.selected_id}")
+                    self.tracker_manager.record_completions(self.selected_id, completions)
+                    self.close_dialog()
+                    set_mode('menu')
+                else:
+                    display_message(f"Invalid history: '{completions}'", 'error')
         else:
-            display_message("No completion datetime provided.", 'error')
+            logger.debug(f"no history for {self.selected_id}")
+            self.display_area.text = "No completion datetime provided."
+            self.close_dialog()
         set_mode('menu')
         self.app.layout.focus(self.display_area)
 
@@ -1893,7 +1934,7 @@ class Dialog:
             ok, completions = Tracker.parse_completions(completion_str)
             logger.debug(f"recording completion_dt: '{completions}' for {self.selected_id}")
             self.tracker_manager.record_completions(self.selected_id, completions)
-            close_dialog()
+            self.close_dialog()
         else:
             self.display_area.text = "No completion datetime provided."
         set_mode('menu')
@@ -1906,7 +1947,7 @@ class Dialog:
         if name_str:
             self.tracker_manager.trackers[self.selected_id].rename(name_str)
             logger.debug(f"recorded new name: '{name_str}' for {self.selected_id}")
-            close_dialog()
+            self.close_dialog()
         else:
             self.display_area.text = "New name not provided."
         set_mode('menu')
@@ -1914,7 +1955,6 @@ class Dialog:
         self.app.layout.focus(self.display_area)
 
     def handle_settings(self, event=None):
-
         yaml_string = input_area.text
         if yaml_string:
             yaml_input = StringIO(yaml_string)
@@ -1925,7 +1965,7 @@ class Dialog:
             self.tracker_manager.settings.update(updated_settings)
             transaction.commit()
             logger.debug(f"updated settings:\n{yaml_string}")
-            close_dialog()
+            self.close_dialog()
         set_mode('menu')
         list_trackers()
         self.app.layout.focus(self.display_area)
@@ -1957,7 +1997,7 @@ class Dialog:
                 else:
                     # add a fictitious completion at td before dt
                     self.tracker_manager.record_completion(doc_id, (dt-td, timedelta(0)))
-            close_dialog()
+            self.close_dialog()
         if msg:
             self.display_area.text = "\n".join(msg)
         set_mode('menu')
@@ -1985,7 +2025,11 @@ class Dialog:
         if key_pressed == 'escape':
             set_mode('menu')
             return
-        close_dialog()
+        self.close_dialog()
+
+    def do_nothing(self, event):
+        # bind to a key, e.g., 'enter',  as a way of removing the prior binding
+        pass
 
 # Dialog usage:
 dialog_new = Dialog("new", kb, tracker_manager, message_control, display_area, wrap)
