@@ -26,7 +26,7 @@ The recorded history of completions is thus a list of (datetime, timedelta=0m) p
       history: [(dt[0], td[0]), (dt[1], td[1]), (dt[2], td[2]), ...]
       intervals: [dt[1] + td[1] - dt[0], dt[2] + td[2] - dt[1], ...]
 
-Here is a part of a screenshot from the "inspect" display for the "fill bird feeders" tracker showing a history of four completions together with the corresponding three intervals and other related calculations:
+Here is an illustration of the "inspect" display for the "fill bird feeders" tracker showing a history of three completions together with the corresponding two intervals and other related calculations:
 
     name:         fill bird feeders
     doc_id:       1
@@ -58,7 +58,7 @@ where, by default, `η = 2`. With these settings at least 75% of the intervals w
 
 The list view reflects theses calculations:
 
-    ‌tag  forecast  η spread   latest    name
+    tag  forecast  η spread   latest    name
     a    24-09-12  2d4h      24-09-02   fill bird feeders
     b    24-09-17  3d1h30m   24-09-10   between early and late
     c    24-09-18  1d20h     24-09-11   before early

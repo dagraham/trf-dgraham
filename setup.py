@@ -14,7 +14,8 @@ setup(
     author="Daniel A Graham",  # Replace with your name
     author_email="dnlgrhm@gmail.com",  # Replace with your email
     description="This is a simple application for recording the sequence of occasions on which a task is completed and forecasting when the next completion might be needed.",
-    long_description=open("README.md").read(),  # If you have a README file
+    # long_description=open("README.md").read(),  # If you have a README file
+    long_description=open("README.txt").read(),  # If you have a README file
     long_description_content_type="text/markdown",
     url="https://github.com/dagraham/trf-dgraham",  # Replace with the repo URL if applicable
     packages=find_packages(),

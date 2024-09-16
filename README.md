@@ -26,7 +26,7 @@ The recorded history of completions is thus a list of (datetime, timedelta=0m) p
       history: [(dt[0], td[0]), (dt[1], td[1]), (dt[2], td[2]), ...]
       intervals: [dt[1] + td[1] - dt[0], dt[2] + td[2] - dt[1], ...]
 
-Here is a part of a screenshot from the "inspect" display for the "fill bird feeders" tracker showing a history of four completions together with the corresponding three intervals and other related calculations:
+Here is an illustration of the "inspect" display for the "fill bird feeders" tracker showing a history of three completions together with the corresponding two intervals and other related calculations:
 
 ![inspect view](tracker_inspect.png)
 

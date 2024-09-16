@@ -1437,7 +1437,7 @@ def get_tracker_from_row()->int:
 
 def read_readme():
     try:
-        with open("README.md", "r") as file:
+        with open("README.txt", "r") as file:
             return file.read()
     except FileNotFoundError:
         return "README.md file not found."
