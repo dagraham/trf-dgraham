@@ -1815,8 +1815,9 @@ class Dialog:
         elif self.action_type == "inspect":
             set_mode('menu')
             tracker = tracker_manager.get_tracker_from_id(self.selected_id)
-            display_message(tracker.get_tracker_info(), 'info')
-            app.layout.focus(display_area)
+            if tracker:
+                display_message(tracker.get_tracker_info(), 'info')
+                app.layout.focus(display_area)
 
         elif self.action_type == "settings":
             self.message_control.text = " Edit settings. \nPress 'enter' to save changes or '^c' to cancel"

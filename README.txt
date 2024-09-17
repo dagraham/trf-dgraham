@@ -6,12 +6,12 @@ This is a simple application for tracking the sequence of occasions on which a t
 
 As an example, consider the task of "filling the bird feeders". Suppose you want to have an idea when you should next fill them. One approach would be to set a reminder to fill them every 14 days starting from the last time you filled them. When the reminder is triggered, you could check the feeders to see if they are empty. If they are, you could fill them and then perhaps adjust the reminder to repeat every 13 days. On the other hand, if they are not yet empty, you might adjust the reminder to repeat every 15 days. Repeating this process, you might eventually set a repetition frequency for the reminder that predicts fairly well the next time you should fill them.
 
-The goal of *track* is to save you trouble of going through this iterative process. Here's how it works:
+The goal of *trf* is to save you trouble of going through this iterative process. Here's how it works:
 
 
-1. In *track*, press "n" to add a new tracker and name it "fill bird feeders".
+1. In *trf*, press "n" to add a new tracker and name it "fill bird feeders".
 2. The first time you fill the feeders, press "c" to add a completion, select the "fill bird feeders" tracker and enter the date and time of the completion. This date and time will be added to the history of completions for the "fill bird feeders" tracker.
-3. The next time you need to fill the feeders, repeat the process described in step 2. At this point, you will have two datetimes in the history of the tracker, track will calculate the interval between them and set the "expected next completion" by adding the interval to last completion date and time.
+3. The next time you need to fill the feeders, repeat the process described in step 2. At this point, you will have two datetimes in the history of the tracker, *trf* will calculate the interval between them and set the "expected next completion" by adding the interval to last completion date and time.
 4. The process repeats with each completion. There are only two differences when there are more than 2 completions:
 
       - The "expected next completion" is calculated by adding the *average* of the intervals to the last completion date and time.
@@ -69,61 +69,128 @@ The list view reflects theses calculations:
     e       ~         ~         ~       no completions yet
 
 
-In this view, the `forecast` column shows, as discussed above, the sum of `latest` (the last completion) and the average interval between completions. The `η × spread` column shows the product of `η` and the `spread`, e.g., for the bird feeder example, `η = 2` and `spread = 14h` so the column shows `2 × 14h = 28h = 1d4h`.
+In this view, the `tag` column presents a convenient way of selecting a tracker for use in another command. E.g., pressing `t` (for tag) and then `c` would move the cursor to the row corresoding to tag `c`. Because only lower-case letters are used for tags, only 26 tags can be displayed on a single page in list view. When there are more than 26 trackers, the list view is divided into multiple pages with the left and right cursor keys used to navigate between pages.
 
-Since it is currently 10:32am on September 16 or `240916T1032` and this is past `late = 240914T0000` for bird feeders, the display shows the bird feeder tracker in a suspiciously-late color, burnt orange. By comparison, `early` and `late` datetimes for "between late and early" are September 17 plus or minus 6 days and 3 hours.  Since the current time lies within this interval, "between early and late" gets an anytime-now color, gold. Finally, since `early` for "before early" is September 21 minus 3 days and 14 hours which is later than the current time, "before early" gets a not-yet color, blue. There is no forecast for the last two trackers since neither have the two or more completions which are required for an interval on which to base a forecast, so these get trackers get the the no-forecast color, white.
+The `forecast` column shows, as mentioned above, the sum of `latest` (the last completion) and the average interval between completions. The `η × spread` column shows the product of `η` and the `spread`, e.g., for the bird feeder example, `η = 2` and `spread = 14h` so the column shows `2 × 14h = 28h = 1d4h`. How good is the forecast? At least 75% of observed intervals would place the actual outcome within `1d4h` of the forecast.
 
-By default, trackers are sorted in reverse order by their "forecast" datetimes, since this is the order in which they will likely need to be completed, and colors them by likely urgency. It is also possible to sort trackers by "latest", "name" or "doc_id" (creation order).
+Since it is currently 10:32am on September 16 or `240916T1032` and this is past `late = 240914T0000`, i.e., more than 1d4h after the forecast for bird feeders, the display shows the bird feeder tracker in a suspiciously-late color, burnt orange. By comparison, `early` and `late` datetimes for "between late and early" are September 17 plus or minus 3 days, 1 hour and 30 minutes.  Since the current time lies within this interval, "between early and late" gets an anytime-now color, gold. Finally, since `early` for "before early" is September 21 minus 1 days and 20 hours and this is later than the current time, "before early" gets a not-yet color, blue. There is no forecast for the last two trackers since neither have the two or more completions which are required for an interval on which to base a forecast, so these get trackers get the the no-forecast color, white.
 
-### Options when creating a new tracker
+### Usage
 
-When you press 'n' to create a new tracker, the one requirement is that you specify a name for the new tracker
+#### Installation
+
+This README is available online at [GitHub.io](https://dagraham.github.io/trf-dgraham/). The code itself is available either from [PyPi](https://pypi.org/project/trf-dgraham/) or [GitHub](https://github.com/dagraham/trf-dgraham).
+
+The easiest way to install *trf* is to use either pipx (recommended) or pip:
+
+- Using pipx
+
+    ```bash
+    pipx install [--force] trf-dgraham
+    ```
+
+- Using pip
+
+    ```bash
+    pip install [-U] trf-dgraham
+    ```
+
+The optional arguments, --force and -U, are used to update an existing installation.
+
+#### Starting *trf*
+
+Once installed you can start *trf* with the following command:
+
+        > trf [log_level] [home_dir] ['restore']
+
+where all three arguments are optional.
+
+- If log_level is given it should be an integer: 10 for debug, 20 for info, 30 for warning or 40 for error. If not given log_level defaults to 20.
+
+- If home_dir is given, it should be the path to the directory for *trf* to use.
+
+    - If home_dir is not given but there is an environmental variable, TRFHOME, that specifies a directory, then that directory will be used as the home directory.
+
+    - Finally, if neither home_dir nor TRFHOME is given, then *trf* will use the current working directory as its home directory.
+
+- If restore is given, then instead of starting *trf*,  an option will be offered to restore the datastore from one of its backup files - more on this below.
+
+The home directory is where the datastore, data backup files and log files are stored.
+
+The datastore used by *trf* is a ZOBD database.  The data itself is a python dictionary with integer doc_id's as keys and dictionaries as values. These dictionaries contain entries for the tracker name and the history of completions and internals for the intervals and other computed values.  An additional dictionary containing user settings is also stored in the ZOBD datastore.
+
+The ZOBD datastore transparently stores these python objects as 'pickled' versions of the objects themselves, using two files called 'track.fs' and 'track.fs.index'. Track keeps a daily, rotating back up of these two files in a zip format when ever 'track.fs' has been modified since the last backup.  Of these zip files, only 7 are kept  including the 3 most recent 3 files and 4 older files separated by intervals of at least 14 days. ZOBD also uses files called 'track.fs.lock' and 'track.fs.tmp' but they are not needed for restoring the datastore and are not backed up.
+
+In addition to the 'backup' subdirectory, *trf* keeps a daily rotating backup of its log files in another subdirectory called 'logs'.
+
+Here is an illustration of home_dir as it might appear on November 9, 2024:
+
+        home_dir
+            backup/
+                240913.zip
+                240928.zip
+                241013.zip
+                241028.zip
+                241106.zip
+                241107.zip
+                241108.zip
+            logs/
+                trf.log
+                trf241102.log
+                trf241103.log
+                trf241104.log
+                trf241105.log
+                trf241106.log
+                trf241107.log
+                trf241108.log
+            trf.fs
+            trf.fs.index
+            trf.fs.lock
+            trf.fs.tmp
+
+If the optional 'restore' were given, then a list of the available backup zip files in the 'backup' sub directory of the home dir would be presented to the user with a prompt to choose the zip file from which to restore the datastore. If the user chooses a zip file, the current 'track.fs' and 'track.fs.index' files would first be saved as 'restore.zip' and then these files would be replaced by the corresponding files from the selected zip file. When next restarted, *trf* would use the restored files.
+
+#### Using *trf*
+
+The menu bar has the following options:
+
+            trf
+                F1) toggle menu
+                F2) about track
+                F3) check for updates
+                F4) edit settings
+                F5) refresh info
+                F6) restore default settings
+                F7) copy display to clipboard
+                F8) help
+                ^q) quit
+            view
+                i) inspect tracker
+                l) list trackers
+                s) sort trackers
+                t) select row from tag
+            edit
+                n) create new tracker
+                c) add completion
+                d) delete tracker
+                e) edit history
+                r) rename tracker
+i
+Most options have fairly obvious meanings and can be invoked either from the menu or by pressing the relevant key. E.g., for `sort trackers`, either clicking the menu item or pressing `s` would offer the option to sort the trackers either by f)orecast datetime, l)atest datetime, n)ame or i)d. Just press the relevant key, e.g., `n` to sort by name.
+
+Similarly, when you press `n` to create a new tracker, the one requirement is that you specify a name for the new tracker
 
         > the name of my tracker
 
-You can, optionally, specify a first completion by appending a datetime, e.g.,
+You can, optionally, specify a first completion by appending a comma and a datetime, e.g.,
 
         > the name of my tracker, 3p
 
-would record a completion for 3pm today. You can also, optionally, provide an estimate for the next completion by appending a timedelta, e.g.,
+would record a completion for 3pm today. You can also, optionally, provide an estimate for the next completion by appending another comma and a timedelta, e.g.,
 
         > the name of my tracker, 3p, +12d
 
 would not only record a completion for 3pm today but also provide 12 days as an initial estimate for the interval until the next completion will be needed.
 
-### Usage
+As a final illustration, if you press `i` to inspect a tracker when the cursor is in a row of the list view corresponding to a tracker, details about the tracker will be immediately displayed. However, if a tracker row is not selected, then you will first be prompted to select a tracker by pressing the key corresponding to the tag from the first column of the list view that corresponds to the tracker. E.g., pressing `i` and then `c` at the prompt would show the details of "before early" in the illustration above.
 
-#### Data, Backup and Restore
-
-Track stores its data in a ZOBD database.  The data itself is a python dictionary with integer doc_id's as keys and dictionaries as values. These dictionaries contain entries for the tracker name and the history of completions and internals for the intervals and other computed values.  An additional dictionary containing user settings is also stored in the ZOBD datastore.
-
-The ZOBD datastore transparently stores these python objects as 'pickled' versions of the objects themselves, using two files called 'track.fs' and 'track.fs.index'. Track keeps a daily, rotating back up of these two files in a zip format when ever 'track.fs' has been modified since the last backup.  Of these zip files, only 7 are kept  including the 3 most recent 3 files and 4 older files separated by intervals of at least 14 days. Here is an illustrative simulation of the daily backups that would be kept as of November 8, 2024:
-
-        simulating date 241108
-            241108.zip
-            241107.zip
-            241106.zip
-            241028.zip
-            241013.zip
-            240928.zip
-            240913.zip
-
-Track also provides a command line option to restore the datastore from from one of these zip files - more on this later.  ZOBD also uses files called 'track.fs.lock' and 'track.fs.tmp' but they are not needed for restoring the datastore and are not backed up.
-
-#### Track Home Directory
-
-Track stores its data in its 'home directory'. When started from the command line there are three optional arguments:
-
-        python3 track.py [log_level] [home_dir] ['restore']
-
-If log_level is given it should be an integer - 10 for debug, 20 for info, 30 for warning or 40 for error, otherwise log_level defaults to 20.
-
-If home_dir is given, it should be the path to the directory for track to use.
-
-If home_dir is not given but there is an environmental variable, TRACKHOME, that specifies a directory, then that directory will be used as the home directory.
-
-Finally, if neither home_dir nor TRACKHOME is given, then track will use the current working directory as its home directory.
-
-If 'restore' is given, then a list of the available backup zip files in the 'backup' sub directory of the home dir will be presented to the user with a prompt to choose the zip file from which to restore the datastore. If the user chooses a zip file, the current 'track.fs' and 'track.fs.index' files will first be saved as 'restore.zip' and then overwritten with the contents of the selected zip file. The next time track is started it will use the restored datastore.
-
-In addition to the 'backup' subdirectory mentioned above, track keeps a daily rotating backup of its log files in a another subdirectory called 'logs'.
