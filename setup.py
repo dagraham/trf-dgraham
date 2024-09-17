@@ -19,6 +19,10 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/dagraham/trf-dgraham",  # Replace with the repo URL if applicable
     packages=find_packages(),
+    include_package_data=True,  # Include non-Python files specified in MANIFEST.in
+    package_data={
+        '': ['README.txt'],  # Include README.txt in your package
+    },
     # py_modules=["trf"],
     classifiers=[
         "Programming Language :: Python :: 3",
