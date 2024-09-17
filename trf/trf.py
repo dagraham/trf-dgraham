@@ -1454,7 +1454,7 @@ def get_tracker_from_row()->int:
 
 def read_readme():
     try:
-        with importlib.resources.open_text('your_package', 'README.txt') as readme_file:
+        with importlib.resources.open_text('trf-dgraham', 'README.txt') as readme_file:
             return readme_file.read()
             # return file.read()
     except FileNotFoundError:
