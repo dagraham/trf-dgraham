@@ -54,6 +54,7 @@ from prompt_toolkit.layout import Layout
 import logging
 from persistent import Persistent
 import pyperclip
+import importlib.resources
 
 import lorem
 from lorem.text import TextLorem
@@ -1453,10 +1454,11 @@ def get_tracker_from_row()->int:
 
 def read_readme():
     try:
-        with open("README.txt", "r") as file:
-            return file.read()
+        with importlib.resources.open_text('your_package', 'README.txt') as readme_file:
+            return readme_file.read()
+            # return file.read()
     except FileNotFoundError:
-        return "README.md file not found."
+        return "README.txt file not found."
 
 body = HSplit([
     # menu_container,
