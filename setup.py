@@ -1,5 +1,6 @@
 # setup.py
 from setuptools import setup, find_packages
+import os
 
 def read_version():
     with open("trf/__version__.py") as f:
@@ -8,6 +9,10 @@ def read_version():
                 # Extract the version string
                 return line.split("=")[1].strip().strip("'")
 
+readme_path = os.path.join(os.path.dirname(__file__), 'trf', 'README.txt')
+with open(readme_path, "r") as readme_file:
+    long_description = readme_file.read()
+
 setup(
     name="trf-dgraham",  # Replace with your app's name
     version=read_version(),
@@ -15,15 +20,14 @@ setup(
     author_email="dnlgrhm@gmail.com",  # Replace with your email
     description="This is a simple application for recording the sequence of occasions on which a task is completed and forecasting when the next completion might be needed.",
     # long_description=open("README.md").read(),  # If you have a README file
-    long_description=open("README.txt").read(),  # If you have a README file
+    long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/dagraham/trf-dgraham",  # Replace with the repo URL if applicable
     packages=find_packages(),
     include_package_data=True,  # Include non-Python files specified in MANIFEST.in
     package_data={
-        '': ['README.txt'],  # Include README.txt in your package
-    },
-    # py_modules=["trf"],
+        'trf': ['README.txt'],  # Ensure README.txt is included in the trf package
+    },    # py_modules=["trf"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",  # Replace with your license
