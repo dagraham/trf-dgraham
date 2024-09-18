@@ -1366,21 +1366,12 @@ input_area = TextArea(
     focusable=True,
     multiline=True,
     prompt='> ',
-    height=D(preferred=1, max=10),  # Set preferred and max height
+    # height=D(preferred=1, max=10),  # Set preferred and max height
+    height=D(preferred=1),  # Set preferred and max height
     style="class:input-area"
 )
 
 dynamic_input_area = DynamicContainer(lambda: input_area)
-
-menu_mode = [True]
-select_mode = [False]
-bool_mode = [False]
-integer_mode = [False]
-character_mode = [False]
-input_mode = [False]
-dialog_visible = [False]
-input_visible = [False]
-action = [None]
 
 input_container = ConditionalContainer(
     content=dynamic_input_area,

@@ -81,19 +81,15 @@ Since it is currently 10:32am on September 16 or `240916T1032` and this is past 
 
 This README is available online at [GitHub.io](https://dagraham.github.io/trf-dgraham/). The code itself is available either from [PyPi](https://pypi.org/project/trf-dgraham/) or [GitHub](https://github.com/dagraham/trf-dgraham).
 
-The easiest way to install *trf* is to use either pipx (recommended) or pip:
+The easiest way to install *trf* is to use either pipx (recommended) or pip at a terminal prompt:
 
 - Using pipx
 
-    ```bash
-    pipx install [--force] trf-dgraham
-    ```
+        > pipx install [--force] trf-dgraham
 
 - Using pip
 
-    ```bash
-    pip install [-U] trf-dgraham
-    ```
+        > pip install [-U] trf-dgraham
 
 The optional arguments, --force and -U, are used to update an existing installation.
 
