@@ -809,14 +809,14 @@ class TrackerManager:
             return (2, tracker.doc_id)
         if self.sort_by == "latest":
             if latest_dt:
-                return (1, latest_dt)
+                return (0, latest_dt)
             if forecast_dt:
-                return (2, forecast_dt)
-            return (0, tracker.doc_id)
+                return (1, forecast_dt)
+            return (2, tracker.doc_id)
         elif self.sort_by == "name":
             return (0, tracker.name)
         elif self.sort_by == "id":
-            return (0, tracker.doc_id)
+            return (1, tracker.doc_id)
         else: # forecast
             if forecast_dt:
                 return (0, forecast_dt)
@@ -1324,6 +1324,7 @@ integer_mode = [False]
 character_mode = [False]
 input_mode = [False]
 dialog_visible = [False]
+message_visible = [False]
 input_visible = [False]
 action = [None]
 
@@ -1383,9 +1384,14 @@ message_control = FormattedTextControl(text="")
 message_window = DynamicContainer(
     lambda: Window(
         content=message_control,
-        height=D(preferred=1),  # Adjust max height as needed
+        height=D(preferred=1, max=2),  # Adjust max height as needed
         style="class:message-window"
     )
+)
+
+message_container = ConditionalContainer(
+    content=message_window,
+    filter=Condition(lambda: message_visible[0])
 )
 
 dialog_area = HSplit(
@@ -1457,6 +1463,7 @@ body = HSplit([
     display_area,
     search_field,
     status_area,
+    message_container, # Conditional Message Area
     dialog_container,  # Conditional Input Area
 ])
 
@@ -1621,6 +1628,7 @@ def rename_tracker(*event):
     menu_mode[0] = False
     select_mode[0] = True
     dialog_visible[0] = True
+    message_visible[0] = False
     input_visible[0] = False
     message_control.text = wrap(f" {tag_msg} you would like to rename", 0)
 
@@ -1665,6 +1673,7 @@ root_container = MenuContainer(
 )
 
 def set_mode(mode: str):
+    logger.debug(f"setting mode to {mode}")
     if mode == 'menu':
         # for selecting menu items with a key press
         menu_mode[0] = True
@@ -1673,6 +1682,7 @@ def set_mode(mode: str):
         integer_mode[0] = False
         character_mode[0] = False
         dialog_visible[0] = False
+        message_visible[0] = False
         input_visible[0] = False
     elif mode == 'select':
         # for selecting rows by a lower case letter key press
@@ -1681,7 +1691,8 @@ def set_mode(mode: str):
         bool_mode[0] = False
         integer_mode[0] = False
         character_mode[0] = False
-        dialog_visible[0] = True
+        dialog_visible[0] = False
+        message_visible[0] = True
         input_visible[0] = False
     elif mode == 'bool':
         # for selecting y/n with a key press
@@ -1690,7 +1701,8 @@ def set_mode(mode: str):
         bool_mode[0] = True
         integer_mode[0] = False
         character_mode[0] = False
-        dialog_visible[0] = True
+        dialog_visible[0] = False
+        message_visible[0] = True
         input_visible[0] = False
     elif mode == 'integer':
         # for selecting an single digit integer with a key press
@@ -1699,16 +1711,19 @@ def set_mode(mode: str):
         bool_mode[0] = False
         integer_mode[0] = True
         character_mode[0] = False
-        dialog_visible[0] = True
+        dialog_visible[0] = False
+        message_visible[0] = True
         input_visible[0] = False
     elif mode == 'character':
         # for selecting an single digit integer with a key press
+        logger.debug("using character mode")
         menu_mode[0] = False
         select_mode[0] = False
         bool_mode[0] = False
         integer_mode[0] = False
         character_mode[0] = True
-        dialog_visible[0] = True
+        dialog_visible[0] = False
+        message_visible[0] = True
         input_visible[0] = False
     elif mode == 'input':
         # for entering text in the input area
@@ -1718,6 +1733,7 @@ def set_mode(mode: str):
         integer_mode[0] = False
         character_mode[0] = False
         dialog_visible[0] = True
+        message_visible[0] = False
         input_visible[0] = True
 
 class Dialog:
@@ -1849,6 +1865,7 @@ class Dialog:
             self.kb.add(key, filter=Condition(lambda: self.select_mode[0]), eager=True)(lambda event, key=key: self.handle_key_press(event, key))
 
     def set_sort_mode(self, event=None):
+        logger.debug("set_sort_mode")
         set_mode('character')
         self.message_control.text = wrap(f" Sort by f)orecast, l)atest, n)ame or i)d", 0)
         self.set_done_keys(['f', 'l', 'n', 'i', 'escape'])
