@@ -197,7 +197,7 @@ CLOSED_CIRCLE = '⏺'
 # num_sigma = 'η'
 
 
-def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 2):
+def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 1):
     # Preprocess to replace spaces within specific "@\S" patterns with PLACEHOLDER
     text = preprocess_text(text)
     numbered_list = re.compile(r'^\d+\.\s.*')
@@ -966,6 +966,15 @@ tracker_style = {
     'tag': 'fg:gray',
 }
 
+highlight_style = {}
+for k, v in tracker_style.items():
+    highlight_style[k] = tracker_style[k] + ' bg:#ffffcc'
+
+def is_current_row(line_number: int):
+    cursor_row = display_area.document.cursor_position_row
+    logger.debug(f"{line_number = }, {cursor_row = }")
+    return int(line_number) == int(cursor_row)
+
 banner_regex = re.compile(r'^\u200C')
 
 class DefaultLexer(Lexer):
@@ -1060,98 +1069,8 @@ class HelpLexer(Lexer):
 
 
 
-class TrackerLexer(Lexer):
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(TrackerLexer, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
-
-    def __init__(self):
-        if not hasattr(self, '_initialized'):
-            self._initialized = True
-            now = datetime.now()
-        now = datetime.now()
-
-    def lex_document(self, document):
-        # logger.debug("lex_document called")
-        active_page = tracker_manager.active_page
-        lines = document.lines
-        now = datetime.now().strftime("%y-%m-%d")
-        def get_line_tokens(line_number):
-            line = lines[line_number]
-            tokens = []
-
-            if line and line[0] == ' ':  # does line start with a space
-                parts = line.split()
-                if len(parts) < 4:
-                    return [(tracker_style.get('default', ''), line)]
-
-                # Extract the parts of the line
-                tag, next_date, spread, last_date, tracker_name = parts[0], parts[1], parts[2], parts[3], " ".join(parts[4:])
-                id = tracker_manager.tag_to_id.get((active_page, tag), None)
-                alert, warn = tracker_manager.id_to_times.get(id, (None, None))
-
-                # Determine styles based on dates
-                if alert and warn:
-                    if now < alert:
-                        # logger.debug("fine")
-                        next_style = tracker_style.get('next-fine', '')
-                        last_style = tracker_style.get('next-fine', '')
-                        spread_style = tracker_style.get('next-fine', '')
-                        name_style = tracker_style.get('next-fine', '')
-                    elif now >= alert and now < warn:
-                        # logger.debug("alert")
-                        next_style = tracker_style.get('next-alert', '')
-                        last_style = tracker_style.get('next-alert', '')
-                        spread_style = tracker_style.get('next-alert', '')
-                        name_style = tracker_style.get('next-alert', '')
-                    elif now >= warn:
-                        # logger.debug("warn")
-                        next_style = tracker_style.get('next-warn', '')
-                        last_style = tracker_style.get('next-warn', '')
-                        spread_style = tracker_style.get('next-warn', '')
-                        name_style = tracker_style.get('next-warn', '')
-                elif next_date != "~" and next_date > now:
-                    next_style = tracker_style.get('next-fine', '')
-                    last_style = tracker_style.get('next-fine', '')
-                    spread_style = tracker_style.get('next-fine', '')
-                    name_style = tracker_style.get('next-fine', '')
-                else:
-                    next_style = tracker_style.get('default', '')
-                    last_style = tracker_style.get('default', '')
-                    spread_style = tracker_style.get('default', '')
-                    name_style = tracker_style.get('default', '')
-
-                # Format each part with fixed width
-                tag_formatted = f"  {tag:<5}"          # 7 spaces for tag
-                next_formatted = f"{next_date:^8}  "  # 10 spaces for next date
-                last_formatted = f"{last_date:^8}  "  # 10 spaces for last date
-                if spread == "~":
-                    spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
-                else:
-                    spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
-                # Add the styled parts to the tokens list
-                tokens.append((tracker_style.get('tag', ''), tag_formatted))
-                tokens.append((next_style, next_formatted))
-                tokens.append((spread_style, spread_formatted))
-                tokens.append((last_style, last_formatted))
-                tokens.append((name_style, tracker_name))
-            elif banner_regex.match(line):
-                tokens.append((tracker_style.get('banner', ''), line))
-            else:
-                tokens.append((tracker_style.get('default', ''), line))
-            # logger.debug(f"tokens: {tokens}")
-            return tokens
-
-        return get_line_tokens
-
-    @staticmethod
-    def _parse_date(date_str):
-        return datetime.strptime(date_str, "%y-%m-%d")
-
 def get_lexer(document_type):
+    logger.debug(f"get_lexer: {document_type}")
     if document_type == 'list':
         return TrackerLexer()
     elif document_type == 'info':
@@ -1178,50 +1097,61 @@ class TrackerLexer(Lexer):
         active_page = tracker_manager.active_page
         lines = document.lines
         now = datetime.now().strftime("%y-%m-%d")
+        width = shutil.get_terminal_size()[0]
         def get_line_tokens(line_number):
             line = lines[line_number]
             tokens = []
+            if is_current_row(line_number):
+                # Apply style to the whole line with a background for the current line
+                list_style = highlight_style
+                line = f"{line:<{width}}"
+            else:
+                list_style = tracker_style
+                # Apply no special style for other lines
+                # return [('class:default', line)]
 
             if line and line[0] == ' ':  # does line start with a space
                 parts = line.split()
                 if len(parts) < 4:
-                    return [(tracker_style.get('default', ''), line)]
+                    return [(list_style.get('default', ''), line)]
 
                 # Extract the parts of the line
                 tag, next_date, spread, last_date, tracker_name = parts[0], parts[1], parts[2], parts[3], " ".join(parts[4:])
+                tracker_name = f"{tracker_name:<{width-38}}"
                 id = tracker_manager.tag_to_id.get((active_page, tag), None)
                 alert, warn = tracker_manager.id_to_times.get(id, (None, None))
+                logger.debug(f"{width = }, {tracker_name = },  ")
 
                 # Determine styles based on dates
                 if alert and warn:
                     if now < alert:
                         # logger.debug("fine")
-                        next_style = tracker_style.get('next-fine', '')
-                        last_style = tracker_style.get('next-fine', '')
-                        spread_style = tracker_style.get('next-fine', '')
-                        name_style = tracker_style.get('next-fine', '')
+                        next_style = list_style.get('next-fine', '')
+                        last_style = list_style.get('next-fine', '')
+                        spread_style = list_style.get('next-fine', '')
+                        name_style = list_style.get('next-fine', '')
                     elif now >= alert and now < warn:
                         # logger.debug("alert")
-                        next_style = tracker_style.get('next-alert', '')
-                        last_style = tracker_style.get('next-alert', '')
-                        spread_style = tracker_style.get('next-alert', '')
-                        name_style = tracker_style.get('next-alert', '')
+                        next_style = list_style.get('next-alert', '')
+                        last_style = list_style.get('next-alert', '')
+                        spread_style = list_style.get('next-alert', '')
+                        name_style = list_style.get('next-alert', '')
                     elif now >= warn:
                         # logger.debug("warn")
-                        next_style = tracker_style.get('next-warn', '')
-                        last_style = tracker_style.get('next-warn', '')
-                        spread_style = tracker_style.get('next-warn', '')
-                        name_style = tracker_style.get('next-warn', '')
+                        next_style = list_style.get('next-warn', '')
+                        last_style = list_style.get('next-warn', '')
+                        spread_style = list_style.get('next-warn', '')
+                        name_style = list_style.get('next-warn', '')
                 elif next_date != "~" and next_date > now:
-                    next_style = tracker_style.get('next-fine', '')
-                    last_style = tracker_style.get('next-fine', '')
-                    spread_style = tracker_style.get('next-fine', '')
-                    name_style = tracker_style.get('next-fine', '')
+                    next_style = list_style.get('next-fine', '')
+                    last_style = list_style.get('next-fine', '')
+                    spread_style = list_style.get('next-fine', '')
+                    name_style = list_style.get('next-fine', '')
                 else:
-                    next_style = tracker_style.get('default', '')
-                    last_style = tracker_style.get('default', '')
-                    spread_style = tracker_style.get('default', '')
-                    name_style = tracker_style.get('default', '')
+                    next_style = list_style.get('default', '')
+                    last_style = list_style.get('default', '')
+                    spread_style = list_style.get('default', '')
+                    name_style = list_style.get('default', '')
 
                 # Format each part with fixed width
                 tag_formatted = f"  {tag:<5}"          # 7 spaces for tag
@@ -1232,15 +1162,17 @@ class TrackerLexer(Lexer):
                 else:
                     spread_formatted = f"{spread:^8}  "  # 10 spaces for freq
                 # Add the styled parts to the tokens list
-                tokens.append((tracker_style.get('tag', ''), tag_formatted))
+                tokens.append((list_style.get('tag', ''), tag_formatted))
                 tokens.append((next_style, next_formatted))
                 tokens.append((spread_style, spread_formatted))
                 tokens.append((last_style, last_formatted))
                 tokens.append((name_style, tracker_name))
             elif banner_regex.match(line):
-                tokens.append((tracker_style.get('banner', ''), line))
+                # use tracker style to avoid the highlight or list style to apply the highlight
+                # tokens.append((tracker_style.get('banner', ''), line))
+                tokens.append((list_style.get('banner', ''), line))
             else:
-                tokens.append((tracker_style.get('default', ''), line))
+                tokens.append((list_style.get('default', ''), line))
             # logger.debug(f"tokens: {tokens}")
             return tokens
 
@@ -1449,6 +1381,9 @@ def get_tracker_from_row()->int:
         tracker = None
     return tracker
 
+def get_tracker_from_tag(tag: str):
+    return tracker_manager.get_tracker_from_tag(tag)
+
 def read_readme():
     try:
         content = None
@@ -1579,15 +1514,6 @@ def select_tag(*event):
                 display_area.buffer.document.translate_row_col_to_index(row, 0)
             )
 
-# def close_dialog(*event):
-#     action[0] = ""
-#     message_control.text = ""
-#     input_area.text = ""
-#     menu_mode[0] = True
-#     dialog_visible[0] = False
-#     input_visible[0] = False
-#     app.layout.focus(display_area)
-
 @kb.add('c-e')
 def add_example_trackers(*event):
     lm = TextLorem(srange=(2,3))
@@ -1637,7 +1563,7 @@ root_container = MenuContainer(
     body=body,
     menu_items=[
         MenuItem(
-            'track',
+            'system',
             children=[
                 MenuItem('F1) toggle menu', handler=menu),
                 MenuItem('F2) about track', handler=do_about),
@@ -1663,10 +1589,10 @@ root_container = MenuContainer(
             'edit',
             children=[
                 MenuItem('n) create new tracker', handler=lambda: dialog_new.start_dialog(None)),
-                MenuItem('c) add completion', handler=lambda: dialog_complete.start_dialog(None)),
-                MenuItem('d) delete tracker', handler=lambda: dialog_delete.start_dialog(None)),
-                MenuItem('e) edit history', handler=lambda: dialog_edit.start_dialog(None)),
                 MenuItem('r) rename tracker', handler=lambda: dialog_rename.start_dialog(None)),
+                MenuItem('c) add completion', handler=lambda: dialog_complete.start_dialog(None)),
+                MenuItem('e) edit history', handler=lambda: dialog_edit.start_dialog(None)),
+                MenuItem('d) delete tracker', handler=lambda: dialog_delete.start_dialog(None)),
             ]
         ),
     ]
@@ -1740,7 +1666,6 @@ class Dialog:
     def __init__(self, action_type, kb, tracker_manager, message_control, display_area, wrap):
         self.action_type = action_type
         self.kb = kb
-        self.reset_kb = kb
         self.menu_mode = menu_mode
         self.select_mode = select_mode
         self.tracker_manager = tracker_manager
@@ -1789,9 +1714,6 @@ class Dialog:
         message_control.text = ""
         input_area.text = ""
         set_mode('menu')
-        # menu_mode[0] = True
-        # dialog_visible[0] = False
-        # input_visible[0] = False
         app.layout.focus(display_area)
 
 
