@@ -1579,16 +1579,16 @@ root_container = MenuContainer(
         MenuItem(
             'view',
             children=[
-                MenuItem('i) inspect tracker', handler=lambda: dialog_inspect.start_dialog(None)),
                 MenuItem('l) list trackers', handler=list_trackers),
                 MenuItem('s) sort trackers', handler=lambda: dialog_sort.start_dialog(None)),
-                MenuItem('t) select row from tag', handler=select_tag),
             ]
         ),
         MenuItem(
-            'edit',
+            'selected',
             children=[
+                MenuItem('t) select tracker from tag', handler=select_tag),
                 MenuItem('n) create new tracker', handler=lambda: dialog_new.start_dialog(None)),
+                MenuItem('i) inspect tracker', handler=lambda: dialog_inspect.start_dialog(None)),
                 MenuItem('r) rename tracker', handler=lambda: dialog_rename.start_dialog(None)),
                 MenuItem('c) add completion', handler=lambda: dialog_complete.start_dialog(None)),
                 MenuItem('e) edit history', handler=lambda: dialog_edit.start_dialog(None)),
