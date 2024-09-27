@@ -1,6 +1,15 @@
-## trf: tracker - record and forecast
 
-This is a simple application for tracking the sequence of occasions on which a task is completed and predicting when the next completion might be needed.
+<div style="display: flex; align-items: center;">
+  <div style="flex: 1;">
+<H1>trf-dgraham</H1>
+<b>tracker record and forecast</b> is a simple application for tracking the sequence of occasions on which a task is completed and predicting when the next completion will likely be needed.
+  </div>
+  <div style="flex: 0; padding-left: 10px; padding-right: 6px;">
+    <img src="tracker.png" alt="" style="max-width: 140px;">
+  </div>
+</div>
+
+
 
 ### Motivation
 
@@ -9,8 +18,8 @@ As an example, consider the task of "filling the bird feeders". Suppose you want
 The goal of *trf* is to save you trouble of going through this iterative process. Here's how it works:
 
 
-1. In *trf*, press "n" to add a new tracker and name it "fill bird feeders".
-2. The first time you fill the feeders, press "c" to add a completion, select the "fill bird feeders" tracker and enter the date and time of the completion. This date and time will be added to the history of completions for the "fill bird feeders" tracker.
+1. In *trf*, press "N" to add a new tracker and name it "fill bird feeders".
+2. The first time you fill the feeders, press "C" to add a completion, select the "fill bird feeders" tracker and enter the date and time of the completion. This date and time will be added to the history of completions for the "fill bird feeders" tracker.
 3. The next time you need to fill the feeders, repeat the process described in step 2. At this point, you will have two datetimes in the history of the tracker, *trf* will calculate the interval between them and set the "expected next completion" by adding the interval to last completion date and time.
 4. The process repeats with each completion. There are only two differences when there are more than 2 completions:
 
@@ -31,7 +40,7 @@ Here is an illustration of the "inspect" display for the "fill bird feeders" tra
 
 Datetimes are reported using 6 digits for the date and 4 digits for the 24-hour time separated by `T`: `yymmddTHHMM`.  Timedeltas are reported as integer numbers of d (days), h (hours) and m (minutes).
 
-Note that the first interval, `+11d = 11 days`, is the difference between `240823T1400 +1d` and `240813T1400`.  The other intervals are computed in the same way. The `average` interval is just the sum of the two intervals divided by 2. The little downward pointing arrow after the average interval indicates that, since the last interval is less than the average, the average is decreasing.
+Note that the first interval, `+9d11h = 9 days 11 hours`, is the difference between `240829T0600 +1d` and `240820T1900`.  The other intervals are computed in the same way. The `average` interval is just the sum of the two intervals divided by 2. The little upward pointing arrow after the average interval indicates that, since the last interval is greater than the average, the average is decreasing.
 
 The `spread` is the average of the absolute values of the differences between the intervals and the average interval. This *MAD* (mean average deviation) is a standard measure of the spread of a series about its average (mean). These calculations are used in two ways:
 
@@ -43,18 +52,18 @@ The `spread` is the average of the absolute values of the differences between th
 
 where, by default, `η = 2`. With these settings at least 75% of the intervals would put the actual outcome between `early` and `late`. For the bird feeder example:
 
-        early = 240912T2000 - 2 × 14h = 240911T1600
-        late = 240912T2000 + 2 × 14h = 240914T0000
+        early = 240920T0700 - 2 × 1d1h = 240918T0500
+        late = 240920T0700 + 2 × 1d1h = 240922T0900
 
 The list view reflects theses calculations:
 
 ![list view](tracker_list.png)
 
-In this view, the `tag` column presents a convenient way of selecting a tracker for use in another command. E.g., pressing `t` (for tag) and then `c` would move the cursor to the row corresoding to tag `c`. Because only lower-case letters are used for tags, only 26 tags can be displayed on a single page in list view. When there are more than 26 trackers, the list view is divided into multiple pages with the left and right cursor keys used to navigate between pages.
+In this view, the `tag` column presents a convenient way of selecting a tracker for use in another command. E.g., pressing `c`  would move the cursor to the row corresponding to tag `c`. Because only lower-case letters are used for tags, only 26 tags can be displayed on a single page in list view. When there are more than 26 trackers, the list view is divided into multiple pages with the left and right cursor keys used to navigate between pages. An option is to press the integer corresponding to a page number and move the cursor to the first row of that page. Only a single digit can be used with this mechanism but this still allows 9 * 26 = 234 trackers to be quickly selected using at most 2 key presses.
 
-The `forecast` column shows, as mentioned above, the sum of `latest` (the last completion) and the average interval between completions. The `η × spread` column shows the product of `η` and the `spread`, e.g., for the bird feeder example, `η = 2` and `spread = 14h` so the column shows `2 × 14h = 28h = 1d4h`. How good is the forecast? At least 75% of observed intervals would place the actual outcome within `1d4h` of the forecast.
+The `forecast` column shows, as mentioned above, the sum of `latest` (the last completion) and the average interval between completions. The `η × spread` column shows the product of `η` and the `spread`, e.g., for the bird feeder example, `η = 2` and `spread = 1d1h` so the column shows `2 × 1d1h = 2d2h`. How good is the forecast? At least 75% of observed intervals would place the actual outcome within `2d2h` of the forecast.
 
-Since it is currently 10:32am on September 16 or `240916T1032` and this is past `late = 240914T0000`, i.e., more than 1d4h after the forecast for bird feeders, the display shows the bird feeder tracker in a suspiciously-late color, burnt orange. By comparison, `early` and `late` datetimes for "between late and early" are September 17 plus or minus 3 days, 1 hour and 30 minutes.  Since the current time lies within this interval, "between early and late" gets an anytime-now color, gold. Finally, since `early` for "before early" is September 21 minus 1 days and 20 hours and this is later than the current time, "before early" gets a not-yet color, blue. There is no forecast for the last two trackers since neither have the two or more completions which are required for an interval on which to base a forecast, so these get trackers get the the no-forecast color, white.
+Since it is currently 3:48pm on September 23 or `240923T1548` and this is past `late = 240922T0900`, i.e., more than 2d2h after the forecast for bird feeders, the display shows the bird feeder tracker in a suspiciously-late color, burnt orange. By comparison, `early` and `late` datetimes for "between late and early" are September 23 plus or minus 1 day and 2 hours.  Since the current time lies within this interval, "between early and late" gets an anytime-now color, gold. Finally, since `early` for "before early" is September 29 minus 1 day and 2 hours and this is later than the current time, "before early" gets a not-yet color, blue. There is no forecast for the last two trackers since neither have the two or more completions which are required for an interval on which to base a forecast, so these get trackers get the the no-forecast color, white.
 
 ### Usage
 

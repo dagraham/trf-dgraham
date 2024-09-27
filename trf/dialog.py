@@ -23,10 +23,12 @@ menu_keys = [
 
 # only makes sense if the main, list trackers view is showing
 # 'enter' activates 'inspect' if a tracker row is selected
-list_keys = ['enter', 'i', 'c', 'r', 's', 't', 'n', 'space']
+# list_keys = ['enter', 'i', 'c', 'r', 's', 't', 'n', 'space']
+list_keys = ['i', 'c', 'r', 's', 't', 'n', 'space']
 
 # 'enter' returns to the main, list trackers view
-inspect_keys = ['enter', 'c', 'r', 'e', 'd', ]
+# inspect_keys = ['enter', 'c', 'r', 'e', 'd', ]
+inspect_keys = ['c', 'r', 'e', 'd', ]
 
 select_keys = list(string.ascii_lowercase)
 select_keys.append('escape')
@@ -57,17 +59,17 @@ def _(event):
     print("q pressed - common to all modes")
     app.exit()
 
-@kb.add('enter', filter=is_menu_mode)
+# @kb.add('enter', filter=is_menu_mode)
 def _(event):
     print(f"Enter pressed in list mode, {dialog.mode = }")
     dialog.set_mode('inspect')
     # print(f"new mode {dialog.mode = }, {dialog.is_inspect() = }")
 
-@kb.add('enter', filter=is_inspect_mode)
-def _(event):
-    print(f"Enter pressed in inspect mode, {dialog.mode = }")
-    dialog.set_mode('list')
-    # print(f"new mode {dialog.mode = }, {dialog.is_list() = }")
+# @kb.add('enter', filter=is_inspect_mode)
+# def _(event):
+#     print(f"Enter pressed in inspect mode, {dialog.mode = }")
+#     dialog.set_mode('list')
+#     # print(f"new mode {dialog.mode = }, {dialog.is_list() = }")
 
 # Example application setup
 text_area = TextArea()
