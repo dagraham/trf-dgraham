@@ -133,7 +133,7 @@ def setup_logging(trf_home, log_level=logging.INFO, backup_count=7):
     return logger
 
 # Set up logging
-logger = setup_logging(trf_home=trf_home, log_level=log_level)
+logger = setup_logging(trf_home=trf_home, log_level=log_level, backup_count=7)
 
 def init_db(db_path):
     """
@@ -323,7 +323,7 @@ class Tracker(Persistent):
             ret = ''.join(until[:2]) if short else sign + ''.join(until)
             return ret
         except Exception as e:
-            logger.debug(f'{td}: {e}')
+            logger.error(f'{td}: {e}')
             return ''
 
     @classmethod
@@ -381,7 +381,7 @@ class Tracker(Persistent):
 
         period_regex = re.compile(r'(([+-]?)(\d+)([dhms]))+?')
         expanded_period_regex = re.compile(r'(([+-]?)(\d+)\s(day|hour|minute|second)s?)+?')
-        logger.debug(f"parse_td: {td}")
+        # logger.debug(f"parse_td: {td}")
         m = period_regex.findall(td)
         if not m:
             m = expanded_period_regex.findall(str(td))
@@ -427,7 +427,7 @@ class Tracker(Persistent):
         else:
             td = timedelta(0)
 
-        logger.debug(f"parts: {dt}, {td}")
+        # logger.debug(f"parts: {dt}, {td}")
         msg = []
         if not dt:
             return False, ""
@@ -435,7 +435,7 @@ class Tracker(Persistent):
         if not dtok:
             msg.append(dt)
         if td:
-            logger.debug(f"{td = }")
+            # logger.debug(f"{td = }")
             tdok, td = cls.parse_td(td)
             if not tdok:
                 msg.append(td)
@@ -469,14 +469,14 @@ class Tracker(Persistent):
         self.history = []
         self.created = datetime.now()
         self.modified = self.created
-        logger.debug(f"Created tracker {self.name} ({self.doc_id})")
+        logger.info(f"Created tracker {self.name} ({self.doc_id})")
 
 
     @property
     def info(self):
         # Lazy initialization with re-computation logic
         if not hasattr(self, '_info') or self._info is None:
-            logger.debug(f"Computing info for {self.name} ({self.doc_id})")
+            # logger.debug(f"Computing info for {self.name} ({self.doc_id})")
             self._info = self.compute_info()
         return self._info
 
@@ -579,7 +579,7 @@ class Tracker(Persistent):
         self._p_changed = True
 
     def record_completions(self, completions: list[tuple[datetime, timedelta]]):
-        logger.debug(f"starting {self.history = }")
+        # logger.debug(f"starting {self.history = }")
         self.history = []
         for completion in completions:
             if not isinstance(completion, tuple) or len(completion) < 2:
@@ -588,7 +588,7 @@ class Tracker(Persistent):
         self.history.sort(key=lambda x: x[0])
         if len(self.history) > Tracker.max_history:
             self.history = self.history[-Tracker.max_history:]
-        logger.debug(f"ending {self.history = }")
+        # logger.debug(f"ending {self.history = }")
         self.invalidate_info()
         self.modified = datetime.now()
         self._p_changed = True
@@ -604,7 +604,7 @@ class Tracker(Persistent):
 
     def edit_history(self):
         if not self.history:
-            logger.debug("No history to edit.")
+            # logger.debug("No history to edit.")
             return
 
         # Display current history
@@ -658,7 +658,7 @@ class Tracker(Persistent):
         logger.debug(f"{self._info['avg'] = }")
         # insert a placeholder to prevent date and time from being split across multiple lines when wrapping
         # format_str = f"%y-%m-%d{PLACEHOLDER}%H:%M"
-        logger.debug(f"{self.history = }")
+        # logger.debug(f"{self.history = }")
         history = [f"{Tracker.format_dt(x[0])} {Tracker.format_td(x[1])}" for x in self.history] if self.history else []
         history = ', '.join(history)
         intervals = [f"{Tracker.format_td(x)}" for x in self._info['intervals']] if self._info.get('intervals') else []
@@ -679,12 +679,13 @@ class Tracker(Persistent):
     late:     {Tracker.format_dt(self._info.get('late', '?'))}
 """, 0)
 
-def page_banner(active_page_num: int, number_of_pages: int):
-    markers = []
-    for i in range(1, number_of_pages + 1):
-        marker = CLOSED_CIRCLE if i == active_page_num else OPEN_CIRCLE
-        markers.append(marker)
-    return ' '.join(markers)
+def page_banner(active_page_num: int, number_of_pages: int, sort_by: str):
+    return f"{active_page_num}/{number_of_pages}: {sort_by}"
+    # markers = []
+    # for i in range(1, number_of_pages + 1):
+    #     marker = CLOSED_CIRCLE if i == active_page_num else OPEN_CIRCLE
+    #     markers.append(marker)
+    # return ' '.join(markers)
 
 class TrackerManager:
 
@@ -702,11 +703,15 @@ class TrackerManager:
         self.trackers = {}
         self.tag_to_id = {}
         self.row_to_id = {}
+        self.id_to_row = {}
         self.tag_to_row = {}
         self.id_to_times = {}
         self.active_page = 0
+        self.num_pages = 0
+        self.selected_id = None
+        self.selected_row = (None, None)
         self.sort_by = "forecast"
-        logger.debug(f"using data from\n  {self.db}")
+        logger.info(f"using data from\n  {self.db}")
         self.load_data()
 
     def load_data(self):
@@ -721,7 +726,7 @@ class TrackerManager:
                 self.transaction.commit()
             self.trackers = self.root['trackers']
         except Exception as e:
-            logger.debug(f"Warning: could not load data from '{db_path}': {str(e)}")
+            logger.error(f"Warning: could not load data from '{db_path}': {str(e)}")
             self.trackers = {}
 
     def restore_defaults(self):
@@ -759,7 +764,7 @@ class TrackerManager:
         # Save the updated data
         self.save_data()
 
-        logger.debug(f"Tracker '{name}' added with ID {doc_id}")
+        logger.info(f"Tracker '{name}' added with ID {doc_id}")
         return doc_id
 
 
@@ -787,11 +792,9 @@ class TrackerManager:
         display_message(f"{self.trackers[doc_id].get_tracker_info()}", 'info')
 
 
-
-
     def get_tracker_data(self, doc_id: int = None):
         if doc_id is None:
-            logger.debug("data for all trackers:")
+            # logger.debug("data for all trackers:")
             for k, v in self.trackers.items():
                 logger.debug(f"   {k:2> }. {v.get_tracker_data()}")
         elif doc_id in self.trackers:
@@ -831,18 +834,21 @@ class TrackerManager:
         return sorted(trackers, key=self.sort_key)
 
     def list_trackers(self):
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%y-%m-%d")
-        # width = shutil.get_terminal_size()[0]
+        # FIXME: should be by active page
         name_width = shutil.get_terminal_size()[0] - 30
-        num_pages = (len(self.trackers) + 25) // 26
-        set_pages(page_banner(self.active_page + 1, num_pages))
+        self.num_pages = (len(self.trackers) + 25) // 26
+
+        set_pages(page_banner(self.active_page + 1, self.num_pages, self.sort_by))
         banner = f"{ZWNJ} tag   forecast  η spread   latest   name\n"
         rows = []
+
         count = 0
+
         start_index = self.active_page * 26
         end_index = start_index + 26
         sorted_trackers = self.get_sorted_trackers()
         sigma = self.settings.get('η', 1)
+        logger.debug(f"listing {self.active_page = }, {start_index = }, {end_index = }")
         for tracker in sorted_trackers[start_index:end_index]:
             parts = [x.strip() for x in tracker.name.split('@')]
             tracker_name = parts[0]
@@ -865,23 +871,37 @@ class TrackerManager:
             self.id_to_times[tracker.doc_id] = (early.strftime("%y-%m-%d") if early else '', late.strftime("%y-%m-%d") if late else '')
             self.tag_to_id[(self.active_page, tag)] = tracker.doc_id
             self.row_to_id[(self.active_page, count+1)] = tracker.doc_id
-            self.tag_to_row[(self.active_page, tag)] = count+1
+            self.id_to_row[tracker.doc_id] =  (self.active_page, count+1)
+            self.tag_to_row[(self.active_page, tag)] = (self.active_page, count+1) # count+1
             count += 1
             # rows.append(f" {tag}{" "*4}{forecast}{" "*2}{latest}{" "*2}{interval}{" " * 3}{tracker_name}")
             rows.append(f" {tag}{" "*4}{forecast}{" "*2}{spread}{" "*2}{latest}{" " * 3}{tracker_name}")
+        if self.selected_id:
+            self.selected_row = self.id_to_row[self.selected_id]
+        logger.debug(f"{self.id_to_row = }; {self.selected_row = }")
+        logger.debug(f"listing {self.active_page = }, {start_index = }, {end_index = }")
         return banner +"\n".join(rows)
 
     def set_active_page(self, page_num):
+        logger.debug(f"considering setting active page to {page_num = }")
         if 0 <= page_num < (len(self.trackers) + 25) // 26:
             self.active_page = page_num
+            logger.debug(f"setting active page to {page_num = }, {self.active_page = }")
         else:
-            logger.debug("Invalid page number.")
+            # pass
+            logger.debug(f"Invalid page number {page_num}")
+
+    def get_active_page(self):
+        return self.active_page
 
     def next_page(self):
-        self.set_active_page(self.active_page + 1)
+        self.set_active_page(self.get_active_page() + 1)
+        logger.debug(f"next page: {self.active_page = }")
 
     def previous_page(self):
-        self.set_active_page(self.active_page - 1)
+        new_page = max(0, self.get_active_page() - 1)
+        self.set_active_page(new_page)
+        logger.debug(f"previous page: {self.active_page = }")
 
     def first_page(self):
         self.set_active_page(0)
@@ -891,16 +911,19 @@ class TrackerManager:
         pagetag = (self.active_page, tag)
         if pagetag not in self.tag_to_id:
             return None
+        self.selected_id = self.tag_to_id[pagetag]
         return self.trackers[self.tag_to_id[pagetag]]
 
     def get_tracker_from_row(self, row: int):
         pagerow = (self.active_page, row)
         if pagerow not in self.row_to_id:
             return None
+        logger.debug(f"{self.row_to_id = }; {pagerow = }")
+        self.selected_id = self.row_to_id[pagerow]
         return self.trackers[self.row_to_id[pagerow]]
 
     def save_data(self):
-        logger.debug(f"Saving data: {self.trackers = }")
+        logger.info(f"Saving data: {self.trackers = }")
         self.root['trackers'] = self.trackers
         self.transaction.commit()
 
@@ -919,10 +942,17 @@ class TrackerManager:
             tracker.edit_history()
             self.save_data()
         else:
-            logger.debug(f"No tracker found corresponding to label {label}.")
+            logger.error(f"No tracker found corresponding to label {label}.")
 
     def get_tracker_from_id(self, doc_id):
-        return self.trackers.get(doc_id, None)
+        # logger.debug(f"get_tracker_from_id: {doc_id = }; {self.trackers = }")
+        self.selected_id = doc_id
+        tracker = self.trackers.get(doc_id, None)
+        logger.debug(f"get_tracker_from_id: {doc_id = }; {tracker = }")
+        return tracker
+
+    def get_row_from_id(self, doc_id):
+        page, row = self.id_to_row.get(doc_id, (None, None))
 
     def close(self):
         # Make sure to commit or abort any ongoing transaction
@@ -945,12 +975,12 @@ class TrackerManager:
 storage, db, connection, root, transaction = init_db(db_path)
 
 tracker_manager = TrackerManager(storage, db, connection, root, transaction)
-logger.debug(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
+# logger.debug(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
 
 
 tag_msg = "Press the key corresponding to the tag of the tracker"
-tag_keys = list(string.ascii_lowercase)
-tag_keys.append('escape')
+tag_keys = list(string.ascii_lowercase) + ['escape']
+# tag_keys.append('escape')
 bool_keys = ['y', 'n', 'escape', 'enter']
 
 # Application Setup
@@ -968,11 +998,15 @@ tracker_style = {
 
 highlight_style = {}
 for k, v in tracker_style.items():
-    highlight_style[k] = tracker_style[k] + ' bg:#ffffcc'
+    # highlight_style[k] = tracker_style[k] + ' bg:#ffffcc' # Almost white
+    # highlight_style[k] = tracker_style[k] + ' bg:#545655' # Shades of gray
+    # highlight_style[k] = tracker_style[k] + ' bg:#606361'
+    # highlight_style[k] = tracker_style[k] + ' bg:#959896'
+    highlight_style[k] = tracker_style[k] + ' bg:gray'
 
 def is_current_row(line_number: int):
     cursor_row = display_area.document.cursor_position_row
-    logger.debug(f"{line_number = }, {cursor_row = }")
+    # logger.debug(f"{line_number = }, {cursor_row = }")
     return int(line_number) == int(cursor_row)
 
 banner_regex = re.compile(r'^\u200C')
@@ -1023,7 +1057,7 @@ class InfoLexer(Lexer):
         # You should yield tuples of (start_pos, Token) pairs for each token in the document.
 
         # Example: Basic tokenization that highlights keywords in a simple way.
-        logger.debug("lex_document called")
+        # logger.debug("lex_document called")
         active_page = tracker_manager.active_page
         lines = document.lines
         now = datetime.now().strftime("%y-%m-%d")
@@ -1055,7 +1089,7 @@ class HelpLexer(Lexer):
         # You should yield tuples of (start_pos, Token) pairs for each token in the document.
 
         # Example: Basic tokenization that highlights keywords in a simple way.
-        logger.debug("lex_document called")
+        # logger.debug("lex_document called")
         active_page = tracker_manager.active_page
         lines = document.lines
         now = datetime.now().strftime("%y-%m-%d")
@@ -1070,7 +1104,7 @@ class HelpLexer(Lexer):
 
 
 def get_lexer(document_type):
-    logger.debug(f"get_lexer: {document_type}")
+    # logger.debug(f"get_lexer: {document_type}")
     if document_type == 'list':
         return TrackerLexer()
     elif document_type == 'info':
@@ -1120,7 +1154,7 @@ class TrackerLexer(Lexer):
                 tracker_name = f"{tracker_name:<{width-38}}"
                 id = tracker_manager.tag_to_id.get((active_page, tag), None)
                 alert, warn = tracker_manager.id_to_times.get(id, (None, None))
-                logger.debug(f"{width = }, {tracker_name = },  ")
+                # logger.debug(f"{width = }, {tracker_name = },  ")
 
                 # Determine styles based on dates
                 if alert and warn:
@@ -1169,8 +1203,8 @@ class TrackerLexer(Lexer):
                 tokens.append((name_style, tracker_name))
             elif banner_regex.match(line):
                 # use tracker style to avoid the highlight or list style to apply the highlight
-                # tokens.append((tracker_style.get('banner', ''), line))
-                tokens.append((list_style.get('banner', ''), line))
+                tokens.append((tracker_style.get('banner', ''), line))
+                # tokens.append((list_style.get('banner', ''), line))
             else:
                 tokens.append((list_style.get('default', ''), line))
             # logger.debug(f"tokens: {tokens}")
@@ -1232,7 +1266,7 @@ def check_alarms():
         update_status(message)
         newday = ct.strftime("%y-%m-%d")
         if newday != today:
-            logger.debug(f"new day: {newday}")
+            logger.info(f"new day: {newday}")
             today = newday
             rotate_backups(trf_home, logger)
 
@@ -1250,6 +1284,7 @@ def center_text(text, width: int = shutil.get_terminal_size()[0] - 2):
 
 
 menu_mode = [True]
+inspect_mode = [False]
 select_mode = [False]
 bool_mode = [False]
 integer_mode = [False]
@@ -1347,7 +1382,7 @@ status_window = Window(content=status_control, height=1, style="class:status-win
 page_control = FormattedTextControl(text="")
 page_window = Window(content=page_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.CENTER)
 
-right_control = FormattedTextControl(text=f"{tracker_manager.sort_by} ")
+right_control = FormattedTextControl(text="menu ")
 right_window = Window(content=right_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.RIGHT)
 
 
@@ -1370,9 +1405,14 @@ def get_row_col():
     col_number = display_area.document.cursor_position_col
     return row_number, col_number
 
-def get_tracker_from_row()->int:
+def get_page_row():
     row = display_area.document.cursor_position_row
-    page = tracker_manager.active_page
+    page = tracker_manager.get_active_page()
+    return page, row
+
+
+def get_tracker_from_row()->int:
+    page, row = get_page_row()
     id = tracker_manager.row_to_id.get((page, row), None)
     logger.debug(f"{page = }, {row = } => {id = }")
     if id is not None:
@@ -1404,6 +1444,17 @@ body = HSplit([
 
 kb = KeyBindings()
 
+# buffer = display_area.buffer
+# # Function to handle cursor position changes
+# def on_cursor_position_changed(buffer):
+#     tracker = get_tracker_from_row()
+#     logger.debug(f"Cursor position changed: {buffer.cursor_position}; {tracker = }")
+
+# # Bind the cursor position change event
+# buffer.on_cursor_position_changed += on_cursor_position_changed
+
+
+
 @kb.add('f1')
 def menu(event=None):
     """Focus menu."""
@@ -1430,19 +1481,42 @@ def refresh_info(*event):
 @kb.add('right', filter=Condition(lambda: menu_mode[0]))
 def next_page(*event):
 
-    logger.debug("next page")
+    # logger.debug("next page")
     tracker_manager.next_page()
     list_trackers()
 
 @kb.add('left', filter=Condition(lambda: menu_mode[0]))
 def previous_page(*event):
-    logger.debug("previous page")
+    # logger.debug("previous page")
     tracker_manager.previous_page()
     list_trackers()
 
+# for i in range(tracker_manager.num_pages):
+for i in range(1,10):
+    logger.debug(f"setting up key {i}")
+    @kb.add(str(i), filter=Condition(lambda: menu_mode[0]))  # Bind keys '1' to '4'
+    def _(event, i=i):  # Use i=i to capture the current value of i
+        logger.debug(f"setting active page to {i}")
+        tracker_manager.set_active_page(i-1)
+        list_trackers()
+
+for tag in list(string.ascii_lowercase):
+    @kb.add(tag, filter=Condition(lambda: menu_mode[0]))
+    def _(event, tag=tag):
+        logger.debug(f"pressed {tag = }")
+        row = tracker_manager.tag_to_row.get((tracker_manager.active_page, tag))
+        logger.debug(f"got {row = }")
+        if not row:
+            logger.debug(f"{tag} not in {tracker_manager.tag_to_row = }")
+            return
+        display_area.buffer.cursor_position = (
+            display_area.buffer.document.translate_row_col_to_index(row[1], 0)
+        )
+
+
 @kb.add('space', filter=Condition(lambda: menu_mode[0]))
 def first_page(*event):
-    logger.debug("first page")
+    # logger.debug("first page")
     tracker_manager.first_page()
     list_trackers()
 
@@ -1475,14 +1549,38 @@ def display_message(message: str, document_type: str = 'list'):
     message_control.text = ""
     app.invalidate()  # Refresh the UI
 
-@kb.add('l', filter=Condition(lambda: menu_mode[0]))
+@kb.add('enter', filter=Condition(lambda: inspect_mode[0]))
 def list_trackers(*event):
     """List trackers."""
     action[0] = "list"
     set_mode('menu')
     display_message(tracker_manager.list_trackers(), 'list')
+    logger.debug(f"in list_trackers: {tracker_manager.get_tracker_from_id(tracker_manager.selected_id)= }")
+    logger.debug(f"in list_trackers: {tracker_manager.get_row_from_id(tracker_manager.selected_id)= }")
+    page, row = tracker_manager.selected_row
+    if (page, row) != (None, None):
+        logger.debug(f"{page = }, {row = }")
+        # tracker_manager.set_active_page(page)
+        display_area.buffer.cursor_position = (
+            display_area.buffer.document.translate_row_col_to_index(row, 0)
+            )
+
     app.layout.focus(display_area)
     app.invalidate()
+
+@kb.add('enter', filter=Condition(lambda: menu_mode[0]))
+def inspect_tracker(*event):
+    tracker = get_tracker_from_row()
+    logger.debug(f"{tracker = }")
+    if not tracker:
+        return
+    set_mode('inspect')
+    display_message(f"{tracker.get_tracker_info()}", 'info')
+    app.layout.focus(display_area)
+    app.invalidate()
+
+
+
 
 @kb.add('t', filter=Condition(lambda: menu_mode[0]))
 def select_tag(*event):
@@ -1499,7 +1597,7 @@ def select_tag(*event):
 
     def handle_key_press(event, key):
         key_pressed = event.key_sequence[0].key
-        logger.debug(f"{tracker_manager.tag_to_row = }")
+        # logger.debug(f"{tracker_manager.tag_to_row = }")
         if key_pressed in done_keys:
             set_mode('menu')
             message_control.text = ""
@@ -1509,9 +1607,9 @@ def select_tag(*event):
             tag = (tracker_manager.active_page, key_pressed)
             selected_id = tracker_manager.tag_to_id.get(tag)
             row = tracker_manager.tag_to_row.get(tag)
-            logger.debug(f"got id {selected_id} and row {row} from tag {key_pressed}")
+            # logger.debug(f"got id {selected_id} and row {row} from tag {key_pressed}")
             display_area.buffer.cursor_position = (
-                display_area.buffer.document.translate_row_col_to_index(row, 0)
+                display_area.buffer.document.translate_row_col_to_index(row[1], 0)
             )
 
 @kb.add('c-e')
@@ -1558,6 +1656,10 @@ def rename_tracker(*event):
     input_visible[0] = False
     message_control.text = wrap(f" {tag_msg} you would like to rename", 0)
 
+# dummy handler
+def do_nothing(*event):
+    pass
+
 
 root_container = MenuContainer(
     body=body,
@@ -1579,30 +1681,34 @@ root_container = MenuContainer(
         MenuItem(
             'view',
             children=[
-                MenuItem('l) list trackers', handler=list_trackers),
-                MenuItem('s) sort trackers', handler=lambda: dialog_sort.start_dialog(None)),
+                MenuItem('1, 2, ...) select active page', handler=do_nothing),
+                MenuItem('a, b, ...) select tracker by tag', handler=do_nothing),
+                MenuItem('S) sort trackers', handler=lambda: dialog_sort.start_dialog(None)),
+                MenuItem('N) create new tracker', handler=lambda: dialog_new.start_dialog(None)),
             ]
         ),
         MenuItem(
             'selected',
             children=[
-                MenuItem('t) select tracker from tag', handler=select_tag),
-                MenuItem('n) create new tracker', handler=lambda: dialog_new.start_dialog(None)),
-                MenuItem('i) inspect tracker', handler=lambda: dialog_inspect.start_dialog(None)),
-                MenuItem('r) rename tracker', handler=lambda: dialog_rename.start_dialog(None)),
-                MenuItem('c) add completion', handler=lambda: dialog_complete.start_dialog(None)),
-                MenuItem('e) edit history', handler=lambda: dialog_edit.start_dialog(None)),
-                MenuItem('d) delete tracker', handler=lambda: dialog_delete.start_dialog(None)),
+                MenuItem('enter) toggle details', handler=lambda: dialog_inspect.start_dialog(None)),
+                MenuItem('R) rename tracker', handler=lambda: dialog_rename.start_dialog(None)),
+                MenuItem('C) add completion', handler=lambda: dialog_complete.start_dialog(None)),
+                MenuItem('E) edit history', handler=lambda: dialog_edit.start_dialog(None)),
+                MenuItem('D) delete tracker', handler=lambda: dialog_delete.start_dialog(None)),
             ]
         ),
     ]
 )
 
+selected_mode = None
 def set_mode(mode: str):
-    logger.debug(f"setting mode to {mode}")
+    selected_mode = mode
+    logger.debug(f"setting mode to {mode}; {selected_mode = }")
+    right_control.text = f"{selected_mode} "
     if mode == 'menu':
         # for selecting menu items with a key press
         menu_mode[0] = True
+        inspect_mode[0] = False
         select_mode[0] = False
         bool_mode[0] = False
         integer_mode[0] = False
@@ -1613,6 +1719,7 @@ def set_mode(mode: str):
     elif mode == 'select':
         # for selecting rows by a lower case letter key press
         menu_mode[0] = False
+        inspect_mode[0] = False
         select_mode[0] = True
         bool_mode[0] = False
         integer_mode[0] = False
@@ -1623,6 +1730,7 @@ def set_mode(mode: str):
     elif mode == 'bool':
         # for selecting y/n with a key press
         menu_mode[0] = False
+        inspect_mode[0] = False
         select_mode[0] = False
         bool_mode[0] = True
         integer_mode[0] = False
@@ -1633,6 +1741,7 @@ def set_mode(mode: str):
     elif mode == 'integer':
         # for selecting an single digit integer with a key press
         menu_mode[0] = False
+        inspect_mode[0] = False
         select_mode[0] = False
         bool_mode[0] = False
         integer_mode[0] = True
@@ -1642,8 +1751,9 @@ def set_mode(mode: str):
         input_visible[0] = False
     elif mode == 'character':
         # for selecting an single digit integer with a key press
-        logger.debug("using character mode")
+        # logger.debug("using character mode")
         menu_mode[0] = False
+        inspect_mode[0] = False
         select_mode[0] = False
         bool_mode[0] = False
         integer_mode[0] = False
@@ -1654,6 +1764,7 @@ def set_mode(mode: str):
     elif mode == 'input':
         # for entering text in the input area
         menu_mode[0] = False
+        inspect_mode[0] = False
         select_mode[0] = False
         bool_mode[0] = False
         integer_mode[0] = False
@@ -1661,13 +1772,40 @@ def set_mode(mode: str):
         dialog_visible[0] = True
         message_visible[0] = False
         input_visible[0] = True
+    elif mode == 'inspect':
+        # for entering text in the input area
+        menu_mode[0] = False
+        inspect_mode[0] = True
+        select_mode[0] = False
+        bool_mode[0] = False
+        integer_mode[0] = False
+        character_mode[0] = False
+        dialog_visible[0] = False
+        message_visible[0] = False
+        input_visible[0] = False
+
+def log_key_bindings(kb: KeyBindings):
+    output = []
+    for binding in kb.bindings:
+        keys = ' + '.join(str(key) for key in binding.keys)
+        handler = binding.handler.__name__
+
+        # Check for a filter (condition)
+        if binding.filter():
+            condition = binding.filter()  # Get the condition/filter applied
+            output.append(f"       keys: {keys}, handler: {handler}, condition: {condition}")
+        else:
+            output.append(f"       keys: {keys}, handler: {handler}, condition: None")
+    logger.debug("key bindings:\n" + '\n'.join(output))
 
 class Dialog:
     def __init__(self, action_type, kb, tracker_manager, message_control, display_area, wrap):
+        logger.debug(f"initializing dialog for {action_type}")
         self.action_type = action_type
         self.kb = kb
         self.menu_mode = menu_mode
         self.select_mode = select_mode
+        self.selected_id = None
         self.tracker_manager = tracker_manager
         self.message_control = message_control
         self.display_area = display_area
@@ -1682,20 +1820,29 @@ class Dialog:
         self.done_keys = done_keys
 
     def start_dialog(self, event):
-        logger.debug(f"starting dialog for action {self.action_type}")
+        logger.debug(f"starting dialog for action {self.action_type}; id = {self.selected_id}")
+        log_key_bindings(self.kb)
         if self.action_type in [
-            "complete", "delete", "edit", "rename", "inspect"
+            "complete", "delete", "edit", "rename", "inspect", "list"
             ]:
-            tracker = get_tracker_from_row()
+            logger.debug(f"starting with id = {self.selected_id}")
             action[0] = self.action_type
+            tracker = get_tracker_from_row()
             if tracker:
-                self.selected_id = tracker.doc_id
-                logger.debug(f"got tracker from row")
+                self.set_selected_id(tracker.doc_id)
+                logger.debug(f"set self.selected_id to {self.selected_id}")
+                self.set_input_mode(tracker)
+            elif self.selected_id is not None:
+                logger.debug(f"got tracker from id: id = {self.selected_id}")
+                tracker = self.tracker_manager.get_tracker_from_id(self.selected_id)
                 self.set_input_mode(tracker)
             else:
                 self.done_keys = tag_keys
                 self.message_control.text = self.wrap(f" {tag_msg} you would like to {self.action_type}", 0)
                 self.set_select_mode()
+
+        # elif self.action_type == "list":
+        #     self.set_input_mode('list')
 
         elif self.action_type == "new":  # new tracker
             self.set_input_mode(None)
@@ -1706,9 +1853,13 @@ class Dialog:
         elif self.action_type == "sort":
             self.set_sort_mode(None)
 
+    def set_selected_id(self, id):
+        logger.debug(f"setting selected_id to {id}")
+        self.selected_id = id
+
     def close_dialog(self, *event):
         # reset 'enter' and 'c-c' keys by replacing their bindings
-        self.kb.add('enter')(self.do_nothing)
+        # self.kb.add('enter')(self.do_nothing)
         self.kb.add('c-c', eager=True)(self.do_nothing)
         action[0] = ""
         message_control.text = ""
@@ -1745,10 +1896,25 @@ class Dialog:
             self.kb.add('c-c', eager=True)(self.handle_cancel)
 
         elif self.action_type == "inspect":
-            set_mode('menu')
+            logger.debug(f"{self.action_type = } {self.selected_id = }")
+            set_mode('inspect')
             tracker = tracker_manager.get_tracker_from_id(self.selected_id)
             if tracker:
                 display_message(tracker.get_tracker_info(), 'info')
+                app.layout.focus(display_area)
+                logger.debug(f"info for id = {self.selected_id}")
+
+        elif self.action_type == "list":
+            logger.debug(f"{self.action_type = } {self.selected_id = }")
+            set_mode('menu')
+            display_message(tracker_manager.list_trackers(), 'list')
+            page, row = tracker_manager.get_row_from_id(self.selected_id)
+            logger.debug(f"got page {page} and row {row} from id {self.selected_id}")
+            if row and page:
+                tracker_manager.set_active_page(page)
+                display_area.buffer.cursor_position = (
+                    display_area.buffer.document.translate_row_col_to_index(row, 0)
+                )
                 app.layout.focus(display_area)
 
         elif self.action_type == "settings":
@@ -1951,7 +2117,8 @@ class Dialog:
                 self.tracker_manager.sort_by = 'name'
             elif key_pressed == 'i':
                 self.tracker_manager.sort_by = 'id'
-            right_control.text = f"{self.tracker_manager.sort_by} "
+            # if self.selected_id
+            # right_control.text = f"sort: {self.tracker_manager.sort_by[0]} "
             list_trackers()
             self.app.layout.focus(self.display_area)
 
@@ -1964,6 +2131,8 @@ class Dialog:
     def do_nothing(self, event):
         # bind to a key, e.g., 'enter',  as a way of removing the prior binding
         pass
+
+
 
 # Dialog usage:
 dialog_new = Dialog("new", kb, tracker_manager, message_control, display_area, wrap)
@@ -1979,7 +2148,11 @@ dialog_rename = Dialog("rename", kb, tracker_manager, message_control, display_a
 kb.add('r', filter=Condition(lambda: menu_mode[0]))(dialog_rename.start_dialog)
 
 dialog_inspect = Dialog("inspect", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('i', filter=Condition(lambda: menu_mode[0]))(dialog_inspect.start_dialog)
+# kb.add('enter', filter=Condition(lambda: menu_mode[0]))(dialog_inspect.start_dialog)
+
+dialog_list = Dialog("list", kb, tracker_manager, message_control, display_area, wrap)
+kb.add('L', filter=Condition(lambda: inspect_mode[0]))(dialog_list.start_dialog)
+# kb.add('m', filter=Condition(lambda: inspect_mode[0]))(dialog_list.start_dialog)
 
 dialog_settings = Dialog("settings", kb, tracker_manager, message_control, display_area, wrap)
 kb.add('f4', filter=Condition(lambda: menu_mode[0]))(dialog_settings.start_dialog)
@@ -2009,7 +2182,7 @@ app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_suppor
 
 app.layout.focus(root_container.body)
 
-for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_settings]:
+for dialog in [dialog_new, dialog_complete, dialog_delete, dialog_edit, dialog_sort, dialog_rename, dialog_inspect, dialog_list, dialog_settings]:
     dialog.set_app(app)
 
 def main():
