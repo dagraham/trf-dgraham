@@ -191,6 +191,8 @@ NON_BREAKING_HYPHEN = '\u2011'
 # Placeholder for zero-width non-joiner
 ZWNJ = '\u200C'
 
+PLUS_OR_MINUS = '±'
+
 # For showing active page in pages, e.g.,  ○ ○ ⏺ ○ = page 3 of 4 pages
 OPEN_CIRCLE = '○'
 CLOSED_CIRCLE = '⏺'
@@ -859,7 +861,7 @@ class TrackerManager:
             late = tracker._info.get('late', '') if hasattr(tracker, '_info') else ''
             spread = tracker._info.get('spread', '') if hasattr(tracker, '_info') else ''
             # spread = f"±{Tracker.format_td(spread)[1:]: <8}" if spread else f"{'~': ^8}"
-            spread = f"{Tracker.format_td(sigma*spread)[1:]: <8}" if spread else f"{'~': ^8}"
+            spread = f"{PLUS_OR_MINUS}{Tracker.format_td(sigma*spread, True): <8}" if spread else f"{'~': ^8}"
             if tracker.history:
                 latest = tracker.history[-1][0].strftime("%y-%m-%d")
             else:
@@ -1579,9 +1581,6 @@ def inspect_tracker(*event):
     app.layout.focus(display_area)
     app.invalidate()
 
-
-
-
 @kb.add('t', filter=Condition(lambda: menu_mode[0]))
 def select_tag(*event):
     """
@@ -1681,10 +1680,10 @@ root_container = MenuContainer(
         MenuItem(
             'view',
             children=[
-                MenuItem('1, 2, ...) select active page', handler=do_nothing),
-                MenuItem('a, b, ...) select tracker by tag', handler=do_nothing),
-                MenuItem('S) sort trackers', handler=lambda: dialog_sort.start_dialog(None)),
                 MenuItem('N) create new tracker', handler=lambda: dialog_new.start_dialog(None)),
+                MenuItem('S) sort trackers', handler=lambda: dialog_sort.start_dialog(None)),
+                MenuItem('1, 2, ...) select page', disabled=True),
+                MenuItem('a, b, ...) select tracker', disabled=True),
             ]
         ),
         MenuItem(
@@ -1693,7 +1692,7 @@ root_container = MenuContainer(
                 MenuItem('enter) toggle details', handler=lambda: dialog_inspect.start_dialog(None)),
                 MenuItem('R) rename tracker', handler=lambda: dialog_rename.start_dialog(None)),
                 MenuItem('C) add completion', handler=lambda: dialog_complete.start_dialog(None)),
-                MenuItem('E) edit history', handler=lambda: dialog_edit.start_dialog(None)),
+                MenuItem('H) edit history', handler=lambda: dialog_edit.start_dialog(None)),
                 MenuItem('D) delete tracker', handler=lambda: dialog_delete.start_dialog(None)),
             ]
         ),
@@ -2136,16 +2135,16 @@ class Dialog:
 
 # Dialog usage:
 dialog_new = Dialog("new", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('n', filter=Condition(lambda: menu_mode[0]))(dialog_new.start_dialog)
+kb.add('N', filter=Condition(lambda: menu_mode[0]))(dialog_new.start_dialog)
 
 dialog_complete = Dialog("complete", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('c', filter=Condition(lambda: menu_mode[0]))(dialog_complete.start_dialog)
+kb.add('C', filter=Condition(lambda: menu_mode[0]))(dialog_complete.start_dialog)
 
 dialog_edit = Dialog("edit", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('e', filter=Condition(lambda: menu_mode[0]))(dialog_edit.start_dialog)
+kb.add('H', filter=Condition(lambda: menu_mode[0]))(dialog_edit.start_dialog)
 
 dialog_rename = Dialog("rename", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('r', filter=Condition(lambda: menu_mode[0]))(dialog_rename.start_dialog)
+kb.add('R', filter=Condition(lambda: menu_mode[0]))(dialog_rename.start_dialog)
 
 dialog_inspect = Dialog("inspect", kb, tracker_manager, message_control, display_area, wrap)
 # kb.add('enter', filter=Condition(lambda: menu_mode[0]))(dialog_inspect.start_dialog)
@@ -2158,10 +2157,10 @@ dialog_settings = Dialog("settings", kb, tracker_manager, message_control, displ
 kb.add('f4', filter=Condition(lambda: menu_mode[0]))(dialog_settings.start_dialog)
 
 dialog_delete = Dialog("delete", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('d', filter=Condition(lambda: menu_mode[0]))(dialog_delete.start_dialog)
+kb.add('D', filter=Condition(lambda: menu_mode[0]))(dialog_delete.start_dialog)
 
 dialog_sort = Dialog("sort", kb, tracker_manager, message_control, display_area, wrap)
-kb.add('s', filter=Condition(lambda: menu_mode[0]))(dialog_sort.start_dialog)
+kb.add('S', filter=Condition(lambda: menu_mode[0]))(dialog_sort.start_dialog)
 
 def set_pages(txt: str):
     page_control.text = f"{txt} "
