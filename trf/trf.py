@@ -885,13 +885,13 @@ class TrackerManager:
         return banner +"\n".join(rows)
 
     def set_active_page(self, page_num):
-        logger.debug(f"considering setting active page to {page_num = }")
+        logger.debug(f"set_active_page {page_num = }")
         if 0 <= page_num < (len(self.trackers) + 25) // 26:
             self.active_page = page_num
             logger.debug(f"setting active page to {page_num = }, {self.active_page = }")
         else:
-            # pass
-            logger.debug(f"Invalid page number {page_num}")
+            logger.debug(f"Calling display_notice regarding invalid page number {page_num+1}")
+            display_notice(f"Invalid page number {page_num+1}")
 
     def get_active_page(self):
         return self.active_page
@@ -1401,7 +1401,6 @@ status_area = VSplit(
     height=1,
 )
 
-
 def get_row_col():
     row_number = display_area.document.cursor_position_row
     col_number = display_area.document.cursor_position_col
@@ -1566,7 +1565,6 @@ def list_trackers(*event):
         display_area.buffer.cursor_position = (
             display_area.buffer.document.translate_row_col_to_index(row, 0)
             )
-
     app.layout.focus(display_area)
     app.invalidate()
 
@@ -1701,8 +1699,8 @@ root_container = MenuContainer(
 
 selected_mode = None
 def set_mode(mode: str):
+    global selected_mode, menu_mode, select_mode, inspect_mode, bool_mode, integer_mode, character_mode, dialog_visible, message_visible, input_visible
     selected_mode = mode
-    logger.debug(f"setting mode to {mode}; {selected_mode = }")
     right_control.text = f"{selected_mode} "
     if mode == 'menu':
         # for selecting menu items with a key press
@@ -1722,6 +1720,17 @@ def set_mode(mode: str):
         select_mode[0] = True
         bool_mode[0] = False
         integer_mode[0] = False
+        character_mode[0] = False
+        dialog_visible[0] = False
+        message_visible[0] = True
+        input_visible[0] = False
+    elif mode == 'notice':
+        # for transitory messages with slee[0] = False
+        menu_mode[0] = False
+        inspect_mode[0] = False
+        select_mode[0] = True
+        bool_mode[0] = False
+        integer_mode[0] = True
         character_mode[0] = False
         dialog_visible[0] = False
         message_visible[0] = True
@@ -1782,6 +1791,22 @@ def set_mode(mode: str):
         dialog_visible[0] = False
         message_visible[0] = False
         input_visible[0] = False
+    log_modes()
+
+def log_modes():
+    logger.debug(f"""
+    {selected_mode = }
+        {menu_mode = }
+        {inspect_mode = }
+        {select_mode = }
+        {bool_mode = }
+        {integer_mode = }
+        {character_mode = }
+        {dialog_visible = }
+        {message_visible = }
+        {input_visible = }
+        """)
+
 
 def log_key_bindings(kb: KeyBindings):
     output = []
@@ -1796,6 +1821,19 @@ def log_key_bindings(kb: KeyBindings):
         else:
             output.append(f"       keys: {keys}, handler: {handler}, condition: None")
     logger.debug("key bindings:\n" + '\n'.join(output))
+
+def display_notice(message: str, seconds: int = 5):
+    original_mode = selected_mode
+    set_mode('notice')
+    logger.debug(f"display_notice: {message}; {original_mode = }, {selected_mode = }, {message_visible = }")
+    logger.debug(f"setting message_control.text to {message}")
+    message_control.text = message
+    app.invalidate()  # Refresh the UI
+    logger.debug("message should be visible now")
+    time.sleep(seconds)
+    set_mode(original_mode)
+    app.invalidate()
+
 
 class Dialog:
     def __init__(self, action_type, kb, tracker_manager, message_control, display_area, wrap):
