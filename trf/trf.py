@@ -1633,15 +1633,16 @@ def delete(event=None):
     if not tracker:
         return
     set_mode('delete')
-    message_control.text = f'Are you sure you want to delete "{tracker.name}" (doc_id {tracker.doc_id}) (Y/n)?'
+    message_control.text = wrap(f'Are you sure you want to delete "{tracker.name}" (doc_id {tracker.doc_id}) (Y/n)?', 0)
     set_mode('handle_delete')
 
 def handle_delete(event=None):
     key = event.key_sequence[0].key
+    logger.debug(f"got key: {key = }")
     changed = False
-    if key == 'y' or key == 'enter':
-        tracker_manager.delete_tracker(selected_id)
-        logger.debug(f"deleted tracker: {selected_id}")
+    if key == 'y':
+        tracker_manager.delete_tracker(tracker_manager.selected_id)
+        logger.debug(f"deleted tracker: {tracker_manager.selected_id}")
         changed = True
     close_dialog(changed=changed)
 
@@ -1768,9 +1769,6 @@ mode2bindings = {
         'enter': handle_history,
         },
     'delete': {
-        'y': handle_delete,
-        'enter': handle_delete,
-        'n': cancel,
         },
     }
 
@@ -1843,8 +1841,11 @@ def set_bindings():
 
     sort_keys = ['f', 'l', 'n', 'i']
     for key in sort_keys:
-        # kb.add(key, filter=Condition(lambda: is_active_mode('main')), eager=True)(lambda event: sort(event))
         kb.add(key, filter=Condition(lambda: is_active_mode('handle_sort')))(lambda event: handle_sort(event))
+
+    delete_keys = ['y', 'n']
+    for key in delete_keys:
+        kb.add(key, filter=Condition(lambda: is_active_mode('handle_delete')))(lambda event: handle_delete(event))
 
     for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history']:
         kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)), eager=True)(cancel)
@@ -1859,7 +1860,7 @@ def set_mode(active_mode):
     mode = active_mode
     right_control.text = f"{mode} "
     dialog_visible[0] = (
-        mode in ['new', 'complete', 'rename', 'history', 'delete', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history']
+        mode in ['new', 'complete', 'rename', 'history', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history']
         )
     message_visible[0] = (
         mode in ['delete', 'handle_delete', 'sort', 'handle_sort']
