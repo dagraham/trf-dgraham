@@ -1370,7 +1370,7 @@ dynamic_input_area = DynamicContainer(lambda: input_area)
 
 input_container = ConditionalContainer(
     content=dynamic_input_area,
-    filter=Condition(lambda: input_visible[0])
+    filter=Condition(lambda: dialog_visible[0])
 )
 
 message_control = FormattedTextControl(text="")
@@ -1378,7 +1378,8 @@ message_control = FormattedTextControl(text="")
 message_window = DynamicContainer(
     lambda: Window(
         content=message_control,
-        height=D(preferred=1, max=2),  # Adjust max height as needed
+        # height=D(preferred=1, max=2),  # Adjust max height as needed
+        height=D(preferred=1),  # Adjust max height as needed
         style="class:message-window"
     )
 )
@@ -1599,17 +1600,19 @@ def close_dialog(event=None, changed=False):
     message_control.text = ''
     if changed:
         list_trackers()
-    set_mode('menu')
+    set_mode('main')
     app.layout.focus(display_area)
 
 def cancel(event=None):
+    # set_mode('main')
+    # list_trackers()
     close_dialog(event, False)
 
 def new(event=None):
     set_mode('new') # set message display and bindings
-    message_control.text = """\
+    message_control.text = wrap("""\
 Enter the name of the new tracker. Optionally append a comma and the datetime of the first completion, and again, optionally, another comma and the timedelta of the expected interval until the next completion, e.g. 'name, 3p wed, +7d'.  Press 'enter' to save changes or '^c' to cancel.
-"""
+""", 0)
     app.layout.focus(input_area)
     set_mode('handle_new')
 
@@ -1785,29 +1788,23 @@ mode2bindings = {
         'l': handle_sort,
         'n': handle_sort,
         'i': handle_sort,
-        'escape': handle_sort,
         },
     'new': {
         'enter': handle_new,
-        'escape': cancel,
         },
     'complete' : {
         'enter': handle_complete,
-        'escape': cancel,
         },
     'rename' : {
         'enter': handle_rename,
-        'escape': cancel,
         },
     'history' : {
         'enter': handle_history,
-        'escape': cancel,
         },
     'delete': {
         'y': handle_delete,
         'enter': handle_delete,
         'n': cancel,
-        'escape': cancel,
         },
     }
 
@@ -1819,7 +1816,8 @@ def log_key_bindings(kb: KeyBindings):
         # Check for a filter (condition)
         if binding.filter():
             condition = binding.filter()  # Get the condition/filter applied
-            log_output.append(f"       keys: {keys}, handler: {handler}, condition: {condition}")
+            if condition == True:
+                log_output.append(f"       keys: {keys}, handler: {handler}, condition: {condition}")
         else:
             log_output.append(f"       keys: {keys}, handler: {handler}, condition: None")
     logger.debug(f"key bindings for {mode}:\n" + '\n'.join(log_output))
@@ -1867,7 +1865,6 @@ def set_bindings():
                 display_area.buffer.document.translate_row_col_to_index(row, 0)
             )
 
-
     page_keys = list(range(1, 10))
     for key in page_keys:
         # kb.add(str(key), filter=Condition(lambda: is_active_mode('main')), eager=True)(lambda event: move_to_page(event))
@@ -1878,6 +1875,9 @@ def set_bindings():
                 return
             tracker_manager.set_active_page(int(key))
 
+    for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history']:
+        kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)))(cancel)
+
     # log_key_bindings(kb)
 
 dialog_visible = [False]
@@ -1886,19 +1886,20 @@ message_visable = [False]
 def set_mode(active_mode):
     global dialog_visible, message_visible, mode
     mode = active_mode
+    right_control.text = f"{mode} "
     dialog_visible[0] = (
         mode in ['new', 'complete', 'rename', 'history', 'delete', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history']
         )
     message_visable[0] = (
         mode in ['delete']
         )
-
+    logger.debug(f"dialog_visible: {dialog_visible}; message_visible: {message_visible}")
     log_key_bindings(kb)
 
 set_mode('main')
 
-def cancel():
-    set_mode('main')
+# def cancel():
+#     set_mode('main')
 
 set_bindings()
 
