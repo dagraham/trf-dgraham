@@ -1488,9 +1488,8 @@ def menu(event=None):
 
 
 def sort(event=None):
-    logger.debug("set_sort_mode")
-    set_mode('character')
-    self.message_control.text = wrap(f" Sort by f)orecast, l)atest, n)ame or i)d", 0)
+    set_mode('sort')
+    message_control.text = wrap(f" Sort by f)orecast, l)atest, n)ame or i)d", 0)
     set_mode('handle_sort')
 
 def handle_sort(event=None):
@@ -1503,8 +1502,8 @@ def handle_sort(event=None):
         tracker_manager.sort_by = 'name'
     elif key == 'i':
         tracker_manager.sort_by = 'id'
-    elif key == 'escape':
-        cancel()
+    set_mode('main')
+    close_dialog(changed=True)
 
 def do_about(*event):
     display_message('about track ...')
@@ -1525,27 +1524,6 @@ def previous_page(*event):
     logger.debug("previous page")
     tracker_manager.previous_page()
     list_trackers()
-
-# for i in range(1,10):
-#     logger.debug(f"setting up key {i}")
-#     @kb.add(str(i), filter=Condition(lambda: menu_mode[0]))  # Bind keys '1' to '4'
-#     def _(event, i=i):  # Use i=i to capture the current value of i
-#         logger.debug(f"setting active page to {i}")
-#         tracker_manager.set_active_page(i-1)
-#         list_trackers()
-
-# for tag in list(string.ascii_lowercase):
-#     @kb.add(tag, filter=Condition(lambda: menu_mode[0]))
-#     def _(event, tag=tag):
-#         logger.debug(f"pressed {tag = }")
-#         row = tracker_manager.tag_to_row.get((tracker_manager.active_page, tag))
-#         logger.debug(f"got {row = }")
-#         if not row:
-#             logger.debug(f"{tag} not in {tracker_manager.tag_to_row = }")
-#             return
-#         display_area.buffer.cursor_position = (
-#             display_area.buffer.document.translate_row_col_to_index(row[1], 0)
-#         )
 
 def list_trackers(*event):
     """List trackers."""
@@ -1746,14 +1724,6 @@ def handle_history(event=None):
     set_mode('menu')
     app.layout.focus(display_area)
 
-# key = event.key_sequence[0].key
-
-# input_area.text = wrap(tracker.format_history(), 0)
-# self.app.layout.focus(input_area)
-# input_area.accept_handler = lambda buffer: self.handle_history()
-
-# message_control.text = wrap(f' Enter the new completion datetime for "{tracker.name}" (doc_id {tracker.doc_id})', 0)
-# set_mode('handle_history')
 
 mode = 'main'
 mode2bindings = {
@@ -1784,10 +1754,6 @@ mode2bindings = {
         'enter': list_trackers,
         },
     'sort': {
-        'f': handle_sort,
-        'l': handle_sort,
-        'n': handle_sort,
-        'i': handle_sort,
         },
     'new': {
         'enter': handle_new,
@@ -1818,8 +1784,8 @@ def log_key_bindings(kb: KeyBindings):
             condition = binding.filter()  # Get the condition/filter applied
             if condition == True:
                 log_output.append(f"       keys: {keys}, handler: {handler}, condition: {condition}")
-        else:
-            log_output.append(f"       keys: {keys}, handler: {handler}, condition: None")
+        # else:
+        #     log_output.append(f"       keys: {keys}, handler: {handler}, condition: None")
     logger.debug(f"key bindings for {mode}:\n" + '\n'.join(log_output))
 
 def is_active_mode(m: str)-> bool:
@@ -1868,15 +1834,20 @@ def set_bindings():
     page_keys = list(range(1, 10))
     for key in page_keys:
         # kb.add(str(key), filter=Condition(lambda: is_active_mode('main')), eager=True)(lambda event: move_to_page(event))
-        @kb.add(str(key), filter=Condition(lambda: is_active_mode(  'main')))
+        @kb.add(str(key), filter=Condition(lambda: is_active_mode('main')))
         def _event(event):
             key = event.key_sequence[0].key if event else None
             if not key:
                 return
             tracker_manager.set_active_page(int(key))
 
+    sort_keys = ['f', 'l', 'n', 'i']
+    for key in sort_keys:
+        # kb.add(key, filter=Condition(lambda: is_active_mode('main')), eager=True)(lambda event: sort(event))
+        kb.add(key, filter=Condition(lambda: is_active_mode('handle_sort')))(lambda event: handle_sort(event))
+
     for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history']:
-        kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)))(cancel)
+        kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)), eager=True)(cancel)
 
     # log_key_bindings(kb)
 
@@ -1890,8 +1861,8 @@ def set_mode(active_mode):
     dialog_visible[0] = (
         mode in ['new', 'complete', 'rename', 'history', 'delete', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history']
         )
-    message_visable[0] = (
-        mode in ['delete']
+    message_visible[0] = (
+        mode in ['delete', 'handle_delete', 'sort', 'handle_sort']
         )
     logger.debug(f"dialog_visible: {dialog_visible}; message_visible: {message_visible}")
     log_key_bindings(kb)
