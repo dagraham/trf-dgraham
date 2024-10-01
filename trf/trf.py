@@ -1756,8 +1756,18 @@ mode2bindings = {
         },
     'sort': {
         },
-    'new': {
+    'handle_sort': {
+        'f': handle_sort,
+        'l': handle_sort,
+        'n': handle_sort,
+        'i': handle_sort,
+        },
+    'handle_new': {
         'enter': handle_new,
+        },
+    'handle_delete': {
+        'y': handle_delete,
+        'n': handle_delete
         },
     'complete' : {
         'enter': handle_complete,
@@ -1839,13 +1849,13 @@ def set_bindings():
                 return
             tracker_manager.set_active_page(int(key))
 
-    sort_keys = ['f', 'l', 'n', 'i']
-    for key in sort_keys:
-        kb.add(key, filter=Condition(lambda: is_active_mode('handle_sort')))(lambda event: handle_sort(event))
+    # sort_keys = ['f', 'l', 'n', 'i']
+    # for key in sort_keys:
+    #     kb.add(key, filter=Condition(lambda: is_active_mode('handle_sort')))(lambda event: handle_sort(event))
 
-    delete_keys = ['y', 'n']
-    for key in delete_keys:
-        kb.add(key, filter=Condition(lambda: is_active_mode('handle_delete')))(lambda event: handle_delete(event))
+    # delete_keys = ['y', 'n']
+    # for key in delete_keys:
+    #     kb.add(key, filter=Condition(lambda: is_active_mode('handle_delete')))(lambda event: handle_delete(event))
 
     for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history']:
         kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)), eager=True)(cancel)
