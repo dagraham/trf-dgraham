@@ -1584,6 +1584,33 @@ def close_dialog(event=None, changed=False):
 def cancel(event=None):
     close_dialog(event, False)
 
+def settings(event=None):
+    set_mode('settings')
+    message_control.text = " Edit settings. \nPress 'enter' to save changes or '^c' to cancel"
+    settings_map = tracker_manager.settings
+    yaml_string = StringIO()
+    # Step 2: Dump the CommentedMap into the StringIO object
+    yaml.dump(settings_map, yaml_string)
+    # Step 3: Get the string from the StringIO object
+    yaml_output = yaml_string.getvalue()
+    input_area.text = yaml_output
+    app.layout.focus(input_area)
+    set_mode('handle_settings')
+
+def handle_settings(event=None):
+    yaml_string = input_area.text
+    changed = False
+    if yaml_string:
+        yaml_input = StringIO(yaml_string)
+        updated_settings = yaml.load(yaml_input)
+        tracker_manager.settings.update(updated_settings)
+        transaction.commit()
+        tracker_manager.save_data()
+        logger.debug(f"updated settings:\n{yaml_string}")
+        tracker_manager.refresh_info()
+        changed = True
+    close_dialog(changed=changed)
+
 def new(event=None):
     set_mode('new') # set message display and bindings
     message_control.text = wrap("""\
@@ -1723,7 +1750,7 @@ mode2bindings = {
         'f1': menu,
         'f2': do_about,
         'f3': do_check_updates,
-        # 'f4': settings,
+        'f4': settings,
         'f5': refresh_info,
         'f6': do_restore_defaults,
         'f7': save_to_clipboard,
@@ -1766,6 +1793,9 @@ mode2bindings = {
         },
     'handle_history' : {
         'c-s': handle_history,
+        },
+    'handle_settings': {
+        'c-s': handle_settings,
         },
     'delete': {
         },
@@ -1835,7 +1865,7 @@ def set_bindings():
             tracker_manager.set_page(int(key)-1)
             list_trackers()
 
-    for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history', 'handle_sort', 'handle_delete']:
+    for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history', 'handle_sort', 'handle_delete', 'handle_settings']:
         kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)), eager=True)(cancel)
 
     # log_key_bindings(kb)
@@ -1847,7 +1877,7 @@ def set_mode(active_mode):
     mode = active_mode
     right_control.text = f"{mode} "
     dialog_visible[0] = (
-        mode in ['new', 'complete', 'rename', 'history', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history']
+        mode in ['new', 'complete', 'rename', 'history', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history', 'handle_settings']
         )
     message_visible[0] = (
         mode in ['delete', 'handle_delete', 'sort', 'handle_sort']
@@ -1939,17 +1969,26 @@ def add_example_trackers(*event):
         tracker = Tracker(name, doc_id)
         # Add the tracker to the trackers dictionary
         tracker_manager.trackers[doc_id] = tracker
-        # doc_id =tracker_manager.add_tracker(f"# {lm.sentence()[:-1]}") # remove period at end and record for doc_id i+1
-        num_completions = random.choice(range(0,9,2))
-        days = random.choice(range(1,12))
-        offset = timedelta(minutes=-720*days)
-        for j in range(num_completions):
-            minutes = random.choice(range(-144,144, 12))*days
-            offset += timedelta(minutes=days*1440+minutes)
-            comp = today - offset
+        # intervals
+        due = today - timedelta(days=random.choice([-5, 0, 5, 10]))
+        avg =timedelta(days=random.choice([7, 10, 14]), hours=random.choice([8, 12, 16, 20]))
+        mad = avg / random.choice([12, 8, 6])
+        completions = [due-2*avg, due-avg-mad, due]
+        for comp in completions:
             tracker_manager.trackers[doc_id].record_completion(comp)
             tracker_manager.save_data()
         tracker_manager.trackers[doc_id].compute_info()
+        # # doc_id =tracker_manager.add_tracker(f"# {lm.sentence()[:-1]}") # remove period at end and record for doc_id i+1
+        # num_completions = random.choice(range(0,9,2))
+        # days = random.choice(range(1,12))
+        # offset = timedelta(minutes=-720*days)
+        # for j in range(num_completions):
+        #     minutes = random.choice(range(-144,144, 12))*days
+        #     offset += timedelta(minutes=days*1440+minutes)
+        #     comp = today - offset
+        #     tracker_manager.trackers[doc_id].record_completion(comp)
+        #     tracker_manager.save_data()
+        # tracker_manager.trackers[doc_id].compute_info()
     list_trackers()
 
 @kb.add('c-r')
@@ -1989,10 +2028,11 @@ root_container = MenuContainer(
                 MenuItem('C) add completion', handler=lambda: complete(None)),
                 MenuItem('H) edit history', handler=lambda: history(None)),
                 MenuItem('D) delete tracker', handler=lambda: dialog(None)),
-                MenuItem('- shortcuts -', disabled=True),
-                MenuItem('S) sort trackers', disabled=True),
-                MenuItem('1, 2, ...) select page', disabled=True),
-                MenuItem('a, b, ...) select tracker', disabled=True),
+                MenuItem('---  shortcuts  ---', disabled=True),
+                MenuItem('key press    command  ', disabled=True),
+                MenuItem('  S          sort trackers', disabled=True),
+                MenuItem(' 1, 2, ...   select page', disabled=True),
+                MenuItem(' a, b, ...   select tracker', disabled=True),
             ]
         ),
     ]
