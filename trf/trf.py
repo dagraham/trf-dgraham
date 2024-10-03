@@ -20,6 +20,8 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.styles import Style
 from prompt_toolkit.styles.named_colors import NAMED_COLORS
 from prompt_toolkit.lexers import Lexer
+from prompt_toolkit.search import start_search, stop_search
+
 
 from datetime import datetime, timedelta, date
 import time
@@ -216,7 +218,7 @@ UP = '↑'
 DOWN = '↓'
 
 
-def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 1):
+def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 3):
     # Preprocess to replace spaces within specific "@\S" patterns with PLACEHOLDER
     text = preprocess_text(text)
     numbered_list = re.compile(r'^\d+\.\s.*')
@@ -1187,7 +1189,7 @@ class TrackerLexer(Lexer):
         active_page = tracker_manager.active_page
         lines = document.lines
         now = datetime.now().strftime("%y-%m-%d")
-        width = shutil.get_terminal_size()[0]
+        width = shutil.get_terminal_size()[0] - 1
         def get_line_tokens(line_number):
             line = lines[line_number]
             tokens = []
@@ -1374,7 +1376,7 @@ info_lexer = InfoLexer()
 help_lexer = HelpLexer()
 default_lexer = DefaultLexer()
 
-display_area = TextArea(text="", read_only=True, search_field=search_field, lexer=tracker_lexer)
+display_area = TextArea(text="", read_only=True, search_field=search_field, lexer=tracker_lexer, scrollbar=True)
 
 def set_lexer(document_type: str):
     if document_type == 'list':
@@ -1417,7 +1419,6 @@ message_window = DynamicContainer(
         style="class:message-window"
     )
 )
-
 
 message_container = ConditionalContainer(
     content=message_window,
@@ -1510,6 +1511,12 @@ kb = KeyBindings()
 def exit_app(*event):
     """Exit the application."""
     app.exit()
+
+def clear_search(*event):
+    search_state = get_app().current_search_state
+    text = search_state.text
+    search_state.text = ''
+    cancel(event)
 
 
 def menu(event=None):
@@ -1695,7 +1702,8 @@ def delete(event=None):
     if not tracker:
         return
     set_mode('delete')
-    message_control.text = wrap(f'Deleting [{tracker.doc_id}] {tracker.name}.\nPress "y" to confirm this deletion or "n" to cancel.', 0)
+    message = f" Delete tracker [{tracker.doc_id}] {tracker.name}?\n Press 'y' to delete or 'n' to cancel.\n"
+    message_control.text = wrap(message, 0)
     set_mode('handle_delete')
 
 def handle_delete(event=None):
@@ -1839,6 +1847,9 @@ mode2bindings = {
         },
     'delete': {
         },
+    'search': {
+        'escape': clear_search,
+        },
     }
 
 def log_key_bindings(kb: KeyBindings):
@@ -1924,6 +1935,22 @@ def set_mode(active_mode):
         )
     logger.debug(f"dialog_visible: {dialog_visible}; message_visible: {message_visible}")
     # log_key_bindings(kb)
+
+@kb.add('/')
+def _(event):
+    # Your custom logic to set search mode
+    logger.debug("setting search mode")
+    set_mode('search')
+    # Now trigger the built-in search
+    # Now trigger the built-in search
+    start_search(display_area.control)
+
+# # Retain the default behavior by not interfering with the rest
+# @kb.add('/', filter=Condition(lambda: True))  # Filter ensures it won't overwrite
+# def _(event):
+#     # This does nothing, allowing the default search binding to stay active
+#     logger.debug("passing through /")
+#     pass
 
 set_mode('main')
 
