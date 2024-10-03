@@ -212,6 +212,9 @@ OPEN_CIRCLE = '○'
 CLOSED_CIRCLE = '⏺'
 # num_sigma = 'η'
 
+UP = '↑'
+DOWN = '↓'
+
 
 def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 1):
     # Preprocess to replace spaces within specific "@\S" patterns with PLACEHOLDER
@@ -502,7 +505,7 @@ class Tracker(Persistent):
         if not self.history:
             result = dict(
                 last_completion=None, num_completions=0, num_intervals=0, average_interval=timedelta(minutes=0), last_interval=timedelta(minutes=0), spread=timedelta(minutes=0), next_expected_completion=None,
-                early=None, late=None, avg=None
+                future=None, early=None, late=None, avg=None
                 )
         else:
             result['last_completion'] = self.history[-1] if len(self.history) > 0 else None
@@ -513,6 +516,7 @@ class Tracker(Persistent):
             result['last_interval'] = None
             result['average_interval'] = None
             result['next_expected_completion'] = None
+            result['future'] = None
             result['early'] = None
             result['late'] = None
             result['avg'] = None
@@ -532,7 +536,7 @@ class Tracker(Persistent):
                 result['early'] = result['next_expected_completion'] - timedelta(days=1)
                 result['late'] = result['next_expected_completion'] + timedelta(days=1)
                 change = result['intervals'][-1] - result['average_interval']
-                direction = "↑" if change > timedelta(0) else "↓" if change < timedelta(0) else "→"
+                direction = UP if change > timedelta(0) else DOWN if change < timedelta(0) else "→"
                 result['avg'] = f"{Tracker.format_td(result['average_interval'], True)}{direction}"
                 # logger.debug(f"{result['avg'] = }")
             if result['num_intervals'] >= 2:
@@ -544,6 +548,7 @@ class Tracker(Persistent):
                         total += interval - result['average_interval']
                 result['spread'] = total / result['num_intervals']
             if result['num_intervals'] >= 1:
+                result['future'] = result['next_expected_completion'] - (tracker_manager.settings['η']*2) * result['spread']
                 result['early'] = result['next_expected_completion'] - tracker_manager.settings['η'] * result['spread']
                 result['late'] = result['next_expected_completion'] + tracker_manager.settings['η'] * result['spread']
 
@@ -691,6 +696,7 @@ class Tracker(Persistent):
     average:  {self._info['avg']}
     spread:   {Tracker.format_td(self._info['spread'], True)}
  forecast:    {Tracker.format_dt(self._info['next_expected_completion'])}
+    future:   {Tracker.format_dt(self._info.get('future', '?'))}
     early:    {Tracker.format_dt(self._info.get('early', '?'))}
     late:     {Tracker.format_dt(self._info.get('late', '?'))}
 """, 0)
@@ -821,22 +827,33 @@ class TrackerManager:
     def sort_key(self, tracker):
         forecast_dt = tracker._info.get('next_expected_completion', None) if hasattr(tracker, '_info') else None
         latest_dt = tracker._info.get('last_completion', None) if hasattr(tracker, '_info') else None
+        early_dt = tracker._info.get('early', None) if hasattr(tracker, '_info') else None
         if self.sort_by == "forecast":
             if forecast_dt:
                 return (0, forecast_dt)
             if latest_dt:
                 return (1, latest_dt)
             return (2, tracker.doc_id)
+        # if self.sort_by == "early":
+        #     if early_dt:
+        #         return (0, early_dt)
+        #     if forecast_dt:
+        #         return (1, forecast_dt)
+        #     if latest_dt:
+        #         return (1, latest_dt)
+        #     return (2, tracker.doc_id)
         if self.sort_by == "latest":
             if latest_dt:
                 return (0, latest_dt)
             if forecast_dt:
                 return (1, forecast_dt)
             return (2, tracker.doc_id)
-        elif self.sort_by == "name":
+        if self.sort_by == "name":
             return (0, tracker.name)
-        elif self.sort_by == "id":
+        if self.sort_by == "id":
             return (1, tracker.doc_id)
+        if self.sort_by == "modified":
+            return (1, tracker.modified)
         else: # forecast
             if forecast_dt:
                 return (0, forecast_dt)
@@ -848,14 +865,16 @@ class TrackerManager:
         # Extract the list of trackers
         trackers = [v for k, v in self.trackers.items()]
         # Sort the trackers
-        return sorted(trackers, key=self.sort_key)
+        reverse = True if self.sort_by == "modified" else False
+        return sorted(trackers, key=self.sort_key, reverse=reverse)
 
     def list_trackers(self):
-        # FIXME: should be by active page
         name_width = shutil.get_terminal_size()[0] - 30
         self.num_pages = (len(self.trackers) + 25) // 26
 
-        set_pages(page_banner(self.active_page + 1, self.num_pages, self.sort_by))
+        sort = self.sort_by + UP if self.sort_by == 'modified' else self.sort_by + DOWN
+
+        set_pages(page_banner(self.active_page + 1, self.num_pages, sort))
         banner = f"{ZWNJ} tag   forecast  η spread   latest   name\n"
         rows = []
 
@@ -872,6 +891,7 @@ class TrackerManager:
             if len(tracker_name) > name_width:
                 tracker_name = tracker_name[:name_width - 1] + "…"
             forecast_dt = tracker._info.get('next_expected_completion', None) if hasattr(tracker, '_info') else None
+            future = tracker._info.get('future', '') if hasattr(tracker, '_info') else ''
             early = tracker._info.get('early', '') if hasattr(tracker, '_info') else ''
             late = tracker._info.get('late', '') if hasattr(tracker, '_info') else ''
             spread = tracker._info.get('spread', '') if hasattr(tracker, '_info') else ''
@@ -885,7 +905,10 @@ class TrackerManager:
             avg = tracker._info.get('avg', None) if hasattr(tracker, '_info') else None
             interval = f"{avg: <8}" if avg else f"{'~': ^8}"
             tag = tag_keys[count]
-            self.id_to_times[tracker.doc_id] = (early.strftime("%y-%m-%d") if early else '', late.strftime("%y-%m-%d") if late else '')
+            self.id_to_times[tracker.doc_id] = (
+                future.strftime("%y-%m-%d") if future else '',
+                early.strftime("%y-%m-%d") if early else '',
+                late.strftime("%y-%m-%d") if late else '')
             self.tag_to_id[(self.active_page, tag)] = tracker.doc_id
             self.row_to_id[(self.active_page, count+1)] = tracker.doc_id
             self.id_to_row[tracker.doc_id] =  (self.active_page, count+1)
@@ -1001,6 +1024,7 @@ class TrackerManager:
             logger.info("Transaction handled successfully.")
         finally:
             self.connection.close()
+            self.db.close()
 
 # Initialize the ZODB database
 storage, db, connection, root, transaction = init_db(db_path)
@@ -1019,6 +1043,7 @@ tracker_style = {
     'next-warn': 'fg:darkorange',
     'next-alert': 'fg:gold',
     'next-fine': 'fg:lightskyblue',
+    'next-future': 'fg:lightcyan',
     'last-less': '',
     'last-more': '',
     'no-dates': '',
@@ -1184,13 +1209,21 @@ class TrackerLexer(Lexer):
                 tag, next_date, spread, last_date, tracker_name = parts[0], parts[1], parts[2], parts[3], " ".join(parts[4:])
                 tracker_name = f"{tracker_name:<{width-38}}"
                 id = tracker_manager.tag_to_id.get((active_page, tag), None)
-                alert, warn = tracker_manager.id_to_times.get(id, (None, None))
+                future, alert, warn = tracker_manager.id_to_times.get(id, (None,None, None))
                 # logger.debug(f"{width = }, {tracker_name = },  ")
 
                 # Determine styles based on dates
-                if alert and warn:
-                    if now < alert:
+                if future and alert and warn:
+                    if now < future:
+                        # logger.debug("future")
+                        this_style = list_style.get('next-future', '')
+                        next_style = this_style
+                        last_style = this_style
+                        spread_style = this_style
+                        name_style = this_style
+                    if now >= future and now < alert:
                         # logger.debug("fine")
+                        next_style = list_style.get('next-fine', '')
                         next_style = list_style.get('next-fine', '')
                         last_style = list_style.get('next-fine', '')
                         spread_style = list_style.get('next-fine', '')
@@ -1493,17 +1526,22 @@ def menusort(event=None):
 
 def sort(event=None):
     set_mode('sort')
-    message_control.text = wrap(f" Sort by f)orecast, l)atest, n)ame or i)d", 0)
+    # message_control.text = wrap(f" Sort by f)orecast, e)arly, l)atest, m)odified, n)ame or i)d", 0)
+    message_control.text = wrap(f" Sort by f)orecast, l)atest, m)odified, n)ame or i)d", 0)
     set_mode('handle_sort')
 
 def handle_sort(event=None):
     key = event.key_sequence[0].key
+    # if key == 'e':
+    #     tracker_manager.sort_by = 'early'
     if key == 'f':
         tracker_manager.sort_by = 'forecast'
     elif key == 'l':
         tracker_manager.sort_by = 'latest'
     elif key == 'n':
         tracker_manager.sort_by = 'name'
+    elif key == 'm':
+        tracker_manager.sort_by = 'modified'
     elif key == 'i':
         tracker_manager.sort_by = 'id'
     close_dialog(changed=True)
@@ -1773,9 +1811,11 @@ mode2bindings = {
     'sort': {
         },
     'handle_sort': {
+        # 'e': handle_sort,
         'f': handle_sort,
         'l': handle_sort,
         'n': handle_sort,
+        'm': handle_sort,
         'i': handle_sort,
         },
     'handle_new': {
@@ -1960,6 +2000,7 @@ def select_tag(*event):
 
 @kb.add('c-e')
 def add_example_trackers(*event):
+    del_example_trackers()
     lm = TextLorem(srange=(2,3))
     import random
     today = datetime.now().replace(microsecond=0,second=0,minute=0,hour=0)
@@ -1973,22 +2014,25 @@ def add_example_trackers(*event):
         due = today - timedelta(days=random.choice([-5, 0, 5, 10]))
         avg =timedelta(days=random.choice([7, 10, 14]), hours=random.choice([8, 12, 16, 20]))
         mad = avg / random.choice([12, 8, 6])
-        completions = [due-2*avg, due-avg-mad, due]
+        if i < 41:
+            completions = [due-2*avg, due-avg-mad, due]
+        elif i < 44:
+            completions = [due-avg-mad, due]
+        elif i < 47:
+            completions = [due]
+        else:
+            completions = []
+
         for comp in completions:
+            hours = random.choice([0, 0, 0, 0, 0, 0, 12, 24, 36])
+            sign = random.choice([-1, 1])
+            if hours != 0:
+                orig_comp = comp
+                comp = (comp + timedelta(hours=hours), -timedelta(hours=hours)) if sign == 1 else (comp - timedelta(hours=hours), timedelta(hours=hours))
+                logger.debug(f"comp: {comp}; orig_comp: {orig_comp}; sign: {sign}; hours: {hours}")
             tracker_manager.trackers[doc_id].record_completion(comp)
-            tracker_manager.save_data()
+        tracker_manager.save_data()
         tracker_manager.trackers[doc_id].compute_info()
-        # # doc_id =tracker_manager.add_tracker(f"# {lm.sentence()[:-1]}") # remove period at end and record for doc_id i+1
-        # num_completions = random.choice(range(0,9,2))
-        # days = random.choice(range(1,12))
-        # offset = timedelta(minutes=-720*days)
-        # for j in range(num_completions):
-        #     minutes = random.choice(range(-144,144, 12))*days
-        #     offset += timedelta(minutes=days*1440+minutes)
-        #     comp = today - offset
-        #     tracker_manager.trackers[doc_id].record_completion(comp)
-        #     tracker_manager.save_data()
-        # tracker_manager.trackers[doc_id].compute_info()
     list_trackers()
 
 @kb.add('c-r')
@@ -2027,7 +2071,7 @@ root_container = MenuContainer(
                 MenuItem('R) rename tracker', handler=lambda: rename(None)),
                 MenuItem('C) add completion', handler=lambda: complete(None)),
                 MenuItem('H) edit history', handler=lambda: history(None)),
-                MenuItem('D) delete tracker', handler=lambda: dialog(None)),
+                MenuItem('D) delete tracker', handler=lambda: delete(None)),
                 MenuItem('---  shortcuts  ---', disabled=True),
                 MenuItem('key press    command  ', disabled=True),
                 MenuItem('  S          sort trackers', disabled=True),
