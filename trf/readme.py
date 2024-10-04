@@ -1,5 +1,7 @@
 # trf/readme.py
 
+# TODO: import this into trf.py and provide the replacements there.
+
 readme_template = """\
 
 {tracker}

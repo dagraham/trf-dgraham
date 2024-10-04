@@ -26,7 +26,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,  # Include non-Python files specified in MANIFEST.in
     package_data={
-        'trf': ['README.txt', 'requirements.py'],  # Ensure README.txt is included in the trf package
+        'trf': ['README.txt', 'replacements.py'],  # Ensure README.txt is included in the trf package
     },    # py_modules=["trf"],
     classifiers=[
         "Programming Language :: Python :: 3",
