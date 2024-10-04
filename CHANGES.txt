@@ -1,5 +1,9 @@
-Recent tagged changes as of 2024-10-04 14:33:53.285598:
-- 0 seconds ago (HEAD -> working, tag: 0.0.20) Daniel Graham
+Recent tagged changes as of 2024-10-04 14:56:10.815923:
+- 0 seconds ago (HEAD -> working, tag: 0.0.21) Daniel Graham
+    0a718ef 2024-10-04 14:56:10 -0400
+    Tagged version 0.0.21.
+
+- 22 minutes ago (tag: 0.0.20) Daniel Graham
     84eac48 2024-10-04 14:33:53 -0400
     Tagged version 0.0.20.
 
@@ -75,7 +79,3 @@ Recent tagged changes as of 2024-10-04 14:33:53.285598:
 - 3 weeks ago (tag: 0.0.2) Daniel Graham
     387eb5f 2024-09-14 16:19:54 -0400
     Tagged version 0.0.2.
-
-- 3 weeks ago (tag: 0.0.1) Daniel Graham
-    3d13d9f 2024-09-14 15:38:33 -0400
-    Tagged version 0.0.1. initial commit
