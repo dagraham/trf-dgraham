@@ -50,12 +50,12 @@ The `spread` is the average of the absolute values of the differences between th
         early = forecast - η × spread
         late = forecast + η × spread
 
-where, by default, `η = 2`. With these settings at least 75% of the intervals would put the actual outcome between `early` and `late`. For the bird feeder example:
+where the value of η is set by the user. With `η = 3`, e.g., at least 1-1/3^2 ~= 89% of the intervals would put the actual outcome between `early` and `late`. For the bird feeder example:
 
         early = 240920T0700 - 2 × 1d1h = 240918T0500
         late = 240920T0700 + 2 × 1d1h = 240922T0900
 
-The list view reflects theses calculations:
+The list view reflects these calculations:
 
 ![list view](tracker_list.png)
 
