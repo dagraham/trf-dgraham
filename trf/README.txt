@@ -1,7 +1,12 @@
 
-## trf-dgraham
-### tracker - record and forecast
-This is a simple application for tracking the sequence of occasions on which a task is completed and predicting when the next completion will likely be needed.
+ trf-dgraham                               +---------------------+
+                                           |           👣        |
+ tracker - record and forecast             |          👣         |
+ This is a simple application for tracking |            👣       |
+ the sequence of occasions on which a task |              👣     |
+ is completed and predicting when the next |             👣      |
+ completion will likely be needed.         |           👣        |
+                                           +---------------------+
         
 
 
@@ -30,19 +35,21 @@ The recorded history of completions is thus a list of (datetime, timedelta) pair
 
 Here is an illustration of the "inspect" display for the "fill bird feeders" tracker showing a history of three completions together with the corresponding two intervals and other related calculations:
 
-    name:        fill bird feeders
-    doc_id:      1
-    created:     240915T1232
-    modified:    240923T1544
-    completions: (3)
-       240820T1900 +0m, 240829T0600 +1d, 240909T1900 +0m
-    intervals:   (2)
-       +9d11h, +11d13h
-       average:  10d12h↑
-       spread:   1d1h
-    forecast:    240920T0700
-       early:    240918T0500
-       late:     240922T0900
++----------------------------------------------------------------+
+|   name:        fill bird feeders                               |
+|   doc_id:      1                                               |
+|   created:     240915T1232                                     |
+|   modified:    240923T1544                                     |
+|   completions: (3)                                             |
+|      240820T1900 +0m, 240829T0600 +1d, 240909T1900 +0m         |
+|   intervals:   (2)                                             |
+|      +9d11h, +11d13h                                           |
+|      average:  10d12h↑                                         |
+|      spread:   1d1h                                            |
+|   forecast:    240920T0700                                     |
+|      early:    240918T0500                                     |
+|      late:     240922T0900                                     |
++----------------------------------------------------------------+
 
 
 Datetimes are reported using 6 digits for the date and 4 digits for the 24-hour time separated by `T`: `yymmddTHHMM`.  Timedeltas are reported as integer numbers of d (days), h (hours) and m (minutes).
@@ -64,12 +71,14 @@ where, by default, `η = 2`. With these settings at least 75% of the intervals w
 
 The list view reflects theses calculations:
 
-     tag   forecast  η spread   latest    name
-      a    24-09-20   2d2h     24-09-09   fill bird feeders
-      b    24-09-23   1d2h     24-09-13   between early and late
-      c    24-09-29   1d2h     24-09-19   before early
-      d       ~         ~      24-09-12   only one completion
-      e       ~         ~         ~       no completions yet
++----------------------------------------------------------------+
+|  tag   forecast  η spread   latest    name                     |
+|   a    24-09-20   2d2h     24-09-09   fill bird feeders        |
+|   b    24-09-23   1d2h     24-09-13   between early and late   |
+|   c    24-09-29   1d2h     24-09-19   before early             |
+|   d       ~         ~      24-09-12   only one completion      |
+|   e       ~         ~         ~       no completions yet       |
++----------------------------------------------------------------+
 
 
 In this view, the `tag` column presents a convenient way of selecting a tracker for use in another command. E.g., pressing `c`  would move the cursor to the row corresponding to tag `c`. Because only lower-case letters are used for tags, only 26 tags can be displayed on a single page in list view. When there are more than 26 trackers, the list view is divided into multiple pages with the left and right cursor keys used to navigate between pages. An option is to press the integer corresponding to a page number and immediately move the cursor to the first row of that page. Only a single digit can be used with this mechanism but this still allows 9 * 26 = 234 trackers to be quickly selected using at most 2 key presses.

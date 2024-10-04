@@ -186,13 +186,25 @@ settings_map = CommentedMap({
     'ampm': True,
     'yearfirst': True,
     'dayfirst': False,
-    'η': 2
+    'η': 2,
 })
 # Add comments to the dictionary
-settings_map.yaml_set_comment_before_after_key('ampm', before='Track Settings\n\n[ampm] Display 12-hour times with AM or PM if true, \notherwise display 24-hour times')
-settings_map.yaml_set_comment_before_after_key('yearfirst', before='\n[yearfirst] When parsing ambiguous dates, assume the year is first if true, \notherwise assume the month is first')
-settings_map.yaml_set_comment_before_after_key('dayfirst', before='\n[dayfirst] When parsing ambiguous dates, assume the day is first if true, \notherwise assume the month is first')
-settings_map.yaml_set_comment_before_after_key('η', before='\n[η] Use this integer multiple of "spread" for setting the early-to-late \nforecast confidence interval')
+settings_map.yaml_set_comment_before_after_key(
+    'ampm',
+    before='trf settings\n\n[ampm] Display 12-hour times with AM or PM if true, \notherwise display 24-hour times'
+    )
+settings_map.yaml_set_comment_before_after_key(
+    'yearfirst',
+    before='\n[yearfirst] When parsing ambiguous dates, assume the year is first \nif true, otherwise assume the month is first'
+    )
+settings_map.yaml_set_comment_before_after_key(
+    'dayfirst',
+    before='\n[dayfirst] When parsing ambiguous dates, assume the day is first \nif true, otherwise assume the month is first'
+    )
+settings_map.yaml_set_comment_before_after_key(
+    'η',
+    before='\n[η] Use this integer multiple of "spread" for setting the \nearly-to-late forecast confidence interval'
+    )
 
 
 # this will be set in main() as a global variable
@@ -549,14 +561,15 @@ class Tracker(Persistent):
                     else:
                         total += interval - result['average_interval']
                 result['spread'] = total / result['num_intervals']
+                result['n_spread'] = f"{tracker_manager.settings['η']} × {Tracker.format_td(result['spread'], True)} = {Tracker.format_td(tracker_manager.settings['η']*result['spread'], True)}"
             if result['num_intervals'] >= 1:
-                result['future'] = result['next_expected_completion'] - (tracker_manager.settings['η']*2) * result['spread']
+                result['future']  = result['next_expected_completion'] - (tracker_manager.settings['η']*2) * result['spread']
                 result['early'] = result['next_expected_completion'] - tracker_manager.settings['η'] * result['spread']
                 result['late'] = result['next_expected_completion'] + tracker_manager.settings['η'] * result['spread']
 
         self._info = result
         self._p_changed = True
-        # logger.debug(f"returning {result = }")
+        logger.debug(f"returning {result = }")
 
         return result
 
@@ -697,10 +710,11 @@ class Tracker(Persistent):
     {intervals}
     average:  {self._info['avg']}
     spread:   {Tracker.format_td(self._info['spread'], True)}
+    η spread: {self._info.get('n_spread', '?')}
  forecast:    {Tracker.format_dt(self._info['next_expected_completion'])}
-    future:   {Tracker.format_dt(self._info.get('future', '?'))}
-    early:    {Tracker.format_dt(self._info.get('early', '?'))}
-    late:     {Tracker.format_dt(self._info.get('late', '?'))}
+    future:   forecast - 2 × η spread = {Tracker.format_dt(self._info.get('future', '?'))}
+    early:    forecast - η spread     = {Tracker.format_dt(self._info.get('early', '?'))}
+    late:     forecast + η spread     = {Tracker.format_dt(self._info.get('late', '?'))}
 """, 0)
 
 def page_banner(active_page_num: int, number_of_pages: int, sort_by: str):
@@ -871,7 +885,7 @@ class TrackerManager:
         return sorted(trackers, key=self.sort_key, reverse=reverse)
 
     def list_trackers(self):
-        name_width = shutil.get_terminal_size()[0] - 30
+        name_width = shutil.get_terminal_size()[0] - 40
         self.num_pages = (len(self.trackers) + 25) // 26
 
         sort = self.sort_by + UP if self.sort_by == 'modified' else self.sort_by + DOWN
@@ -917,6 +931,7 @@ class TrackerManager:
             self.tag_to_row[(self.active_page, tag)] = (self.active_page, count+1) # count+1
             count += 1
             # rows.append(f" {tag}{" "*4}{forecast}{" "*2}{latest}{" "*2}{interval}{" " * 3}{tracker_name}")
+            #             1  1    4         8      2       8       2      8       3
             rows.append(f" {tag}{" "*4}{forecast}{" "*2}{spread}{" "*2}{latest}{" " * 3}{tracker_name}")
         if self.selected_id:
             self.selected_row = self.id_to_row[self.selected_id]
@@ -1214,39 +1229,23 @@ class TrackerLexer(Lexer):
                     if now < future:
                         # logger.debug("future")
                         this_style = list_style.get('next-future', '')
-                        next_style = this_style
-                        last_style = this_style
-                        spread_style = this_style
-                        name_style = this_style
-                    if now >= future and now < alert:
+                    if future <= now and now < alert:
                         # logger.debug("fine")
-                        next_style = list_style.get('next-fine', '')
-                        next_style = list_style.get('next-fine', '')
-                        last_style = list_style.get('next-fine', '')
-                        spread_style = list_style.get('next-fine', '')
-                        name_style = list_style.get('next-fine', '')
-                    elif now >= alert and now < warn:
+                        this_style = list_style.get('next-fine', '')
+                    elif alert <= now and now < warn:
                         # logger.debug("alert")
-                        next_style = list_style.get('next-alert', '')
-                        last_style = list_style.get('next-alert', '')
-                        spread_style = list_style.get('next-alert', '')
-                        name_style = list_style.get('next-alert', '')
-                    elif now >= warn:
+                        this_style = list_style.get('next-alert', '')
+                    elif warn <= now:
                         # logger.debug("warn")
-                        next_style = list_style.get('next-warn', '')
-                        last_style = list_style.get('next-warn', '')
-                        spread_style = list_style.get('next-warn', '')
-                        name_style = list_style.get('next-warn', '')
+                        this_style = list_style.get('next-warn', '')
                 elif next_date != "~" and next_date > now:
-                    next_style = list_style.get('next-fine', '')
-                    last_style = list_style.get('next-fine', '')
-                    spread_style = list_style.get('next-fine', '')
-                    name_style = list_style.get('next-fine', '')
+                    this_style = list_style.get('next-fine', '')
                 else:
-                    next_style = list_style.get('default', '')
-                    last_style = list_style.get('default', '')
-                    spread_style = list_style.get('default', '')
-                    name_style = list_style.get('default', '')
+                    this_style = list_style.get('default', '')
+                next_style = this_style
+                last_style = this_style
+                spread_style = this_style
+                name_style = this_style
 
                 # Format each part with fixed width
                 tag_formatted = f"  {tag:<5}"          # 7 spaces for tag
@@ -1511,7 +1510,7 @@ def clear_search(*event):
     search_state = get_app().current_search_state
     text = search_state.text
     search_state.text = ''
-    cancel(event)
+    # cancel(event)
 
 def clear_info(*event):
     set_mode('main')
@@ -1636,7 +1635,7 @@ def cancel(event=None):
 
 def settings(event=None):
     set_mode('settings')
-    message_control.text = " Edit settings. \nPress 'enter' to save changes or '^c' to cancel"
+    message_control.text = "Editing settings. \nPress 'ctrl-s' to save changes or 'escape' to cancel"
     settings_map = tracker_manager.settings
     yaml_string = StringIO()
     # Step 2: Dump the CommentedMap into the StringIO object
@@ -2021,7 +2020,7 @@ def add_example_trackers(*event):
     import random
     today = datetime.now().replace(microsecond=0,second=0,minute=0,hour=0)
     for i in range(1,49): # create 48 trackers
-        name = f"# {lm.sentence()[:-1]}"
+        name = f"{lm.sentence()[:-1]}"
         doc_id = 1000 + i # make sure id's don't conflict with existing trackers
         tracker = Tracker(name, doc_id)
         # Add the tracker to the trackers dictionary
@@ -2051,11 +2050,60 @@ def add_example_trackers(*event):
         tracker_manager.trackers[doc_id].compute_info()
     list_trackers()
 
+
+@kb.add('c-i')
+def add_illustrative_trackers(*event):
+    del_example_trackers()
+    import random
+    today = datetime.now().replace(microsecond=0,second=0,minute=0,hour=0)
+    names = { # name -> [forecast days + (before) or - (after) today, num completions]
+        'hot -  late < now': [14, 3],
+        'warm - early < now < late': [7, 3],
+        'cool - future < now < early': [0, 3],
+        'cold - now < future': [-7, 3],
+        'just two completions': [-7, 2],
+        'only one completion': [0, 1],
+        'no completions': [0, 0]
+        }
+    doc_id = 1000
+    for name in names.keys(): # create 6 trackers
+        doc_id += 1
+        tracker = Tracker(name, doc_id)
+        # Add the tracker to the trackers dictionary
+        tracker_manager.trackers[doc_id] = tracker
+        days, completions = names[name]
+        # intervals
+        due = today - timedelta(days=days)
+        avg = timedelta(days=random.choice([6, 7]), hours=random.choice([8, 12, 16, 20]))
+        mad = timedelta(days = 1, hours = random.choice([4, 8, 12]))
+        if completions == 3:
+            completions = [due-2*avg, due-avg-mad, due]
+        elif completions == 2:
+            completions = [due-avg-mad, due]
+        elif completions == 1:
+            completions = [due]
+        else:
+            completions = []
+
+        for comp in completions:
+            hours = random.choice([0, 0, 0, 0, 0, 0, 12, 24, 36])
+            sign = random.choice([-1, 1])
+            if hours != 0:
+                orig_comp = comp
+                comp = (comp + timedelta(hours=hours), -timedelta(hours=hours)) if sign == 1 else (comp - timedelta(hours=hours), timedelta(hours=hours))
+                logger.debug(f"comp: {comp}; orig_comp: {orig_comp}; sign: {sign}; hours: {hours}")
+            tracker_manager.trackers[doc_id].record_completion(comp)
+        tracker_manager.save_data()
+        tracker_manager.trackers[doc_id].compute_info()
+    list_trackers()
+
+
 @kb.add('c-r')
 def del_example_trackers(*event):
     remove = []
     for id, tracker in tracker_manager.trackers.items():
-        if tracker.name.startswith('#'):
+        # if tracker.name.startswith('#'):
+        if tracker.doc_id >= 1000:
             remove.append(id)
     for id in remove:
         tracker_manager.delete_tracker(id)
