@@ -20,7 +20,7 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.styles import Style
 from prompt_toolkit.styles.named_colors import NAMED_COLORS
 from prompt_toolkit.lexers import Lexer
-from prompt_toolkit.search import start_search, stop_search
+from prompt_toolkit.search import start_search, SearchDirection
 
 
 from datetime import datetime, timedelta, date
@@ -1032,13 +1032,8 @@ class TrackerManager:
 storage, db, connection, root, transaction = init_db(db_path)
 
 tracker_manager = TrackerManager(storage, db, connection, root, transaction)
-# logger.debug(f"in trf: created tracker_manager: {tracker_manager.__dict__}")
 
-
-tag_msg = "Press the key corresponding to the tag of the tracker"
-tag_keys = list(string.ascii_lowercase) + ['escape']
-# tag_keys.append('escape')
-bool_keys = ['y', 'n', 'escape', 'enter']
+tag_keys = list(string.ascii_lowercase)
 
 # Application Setup
 tracker_style = {
@@ -1518,6 +1513,12 @@ def clear_search(*event):
     search_state.text = ''
     cancel(event)
 
+def clear_info(*event):
+    set_mode('main')
+    logger.debug("clear info")
+    list_trackers()
+
+
 
 def menu(event=None):
     """Focus menu."""
@@ -1553,11 +1554,15 @@ def handle_sort(event=None):
         tracker_manager.sort_by = 'id'
     close_dialog(changed=True)
 
+def display_info(msg: str, doc_type: str = 'info'):
+    set_mode('info')
+    display_message(msg, 'info')
+
 def do_about(*event):
-    display_message('about track ...')
+    display_info('about track ...')
 
 def do_check_updates(*event):
-    display_message('update info ...')
+    display_info('update info ...')
 
 def refresh_info(*event):
     tracker_manager.refresh_info()
@@ -1605,17 +1610,17 @@ def first_page(*event):
 
 def do_restore_defaults(*event):
     tracker_manager.restore_defaults()
-    display_message("Defaults restored.", 'info')
+    display_info("Defaults restored.", 'info')
 
 def save_to_clipboard(*event):
     # Access the content of the TextArea
     if display_area.text:
         pyperclip.copy(display_area.text)
-        display_message('display copied to system clipboard', 'info')
+        display_info('display copied to system clipboard', 'info')
 
 def do_help(*event):
     help_text = read_readme()
-    display_message(wrap(help_text, 0), 'help')
+    display_info(wrap(help_text, 0), 'help')
 
 
 def close_dialog(event=None, changed=False):
@@ -1850,6 +1855,9 @@ mode2bindings = {
     'search': {
         'escape': clear_search,
         },
+    'info': {
+        'escape': clear_info,
+        },
     }
 
 def log_key_bindings(kb: KeyBindings):
@@ -1884,6 +1892,7 @@ def set_bindings():
     """/
     For each mode, add a binding for each key in mode2bindings[mode] to the corresponding method.
     """
+    logger.debug("set bindings")
     log_output = []
     global kb
     for current_mode, bindings in mode2bindings.items():
@@ -1937,13 +1946,22 @@ def set_mode(active_mode):
     # log_key_bindings(kb)
 
 @kb.add('/')
-def _(event):
+def search_forward(event):
     # Your custom logic to set search mode
     logger.debug("setting search mode")
     set_mode('search')
     # Now trigger the built-in search
     # Now trigger the built-in search
     start_search(display_area.control)
+
+@kb.add('?')
+def search_backward(event):
+    # Your custom logic to set search mode
+    logger.debug("setting search mode")
+    set_mode('search')
+    # Now trigger the built-in search
+    # Now trigger the built-in search
+    start_search(display_area.control, SearchDirection.BACKWARD)
 
 # # Retain the default behavior by not interfering with the rest
 # @kb.add('/', filter=Condition(lambda: True))  # Filter ensures it won't overwrite
@@ -1995,35 +2013,6 @@ def display_message_after_delay(message: str, seconds: int = 2):
     return True
     # app.invalidate()
 
-
-def select_tag(*event):
-    """
-    From a keypress corresponding to a tag, move the cursor to the row corresponding to the tag and set the selected_id to the id of the corresponding tracker.
-    """
-    global done_keys, selected_id
-    done_keys = [x[1] for x in tracker_manager.tag_to_row.keys() if x[0] == tracker_manager.active_page]
-    message_control.text = wrap(f" {tag_msg} you would like to select", 0)
-    set_mode('select')
-
-    for key in tag_keys:
-        kb.add(key, filter=Condition(lambda: select_mode[0]), eager=True)(lambda event, key=key: handle_key_press(event, key))
-
-    def handle_key_press(event, key):
-        key_pressed = event.key_sequence[0].key
-        # logger.debug(f"{tracker_manager.tag_to_row = }")
-        if key_pressed in done_keys:
-            set_mode('menu')
-            message_control.text = ""
-            if key_pressed == 'escape':
-                return
-
-            tag = (tracker_manager.active_page, key_pressed)
-            selected_id = tracker_manager.tag_to_id.get(tag)
-            row = tracker_manager.tag_to_row.get(tag)
-            # logger.debug(f"got id {selected_id} and row {row} from tag {key_pressed}")
-            display_area.buffer.cursor_position = (
-                display_area.buffer.document.translate_row_col_to_index(row[1], 0)
-            )
 
 @kb.add('c-e')
 def add_example_trackers(*event):
@@ -2082,7 +2071,7 @@ root_container = MenuContainer(
                 MenuItem('F1) toggle menu', handler=menu),
                 MenuItem('F2) about track', handler=do_about),
                 MenuItem('F3) check for updates', handler=do_check_updates),
-                MenuItem('F4) edit settings', handler=lambda: dialog_settings.start_dialog(None)),
+                MenuItem('F4) edit settings', handler=settings),
                 MenuItem('F5) refresh info', handler=refresh_info),
                 MenuItem('F6) restore default settings', handler=do_restore_defaults),
                 MenuItem('F7) copy display to clipboard', handler=save_to_clipboard),
@@ -2101,6 +2090,8 @@ root_container = MenuContainer(
                 MenuItem('D) delete tracker', handler=lambda: delete(None)),
                 MenuItem('---  shortcuts  ---', disabled=True),
                 MenuItem('key press    command  ', disabled=True),
+                MenuItem('  /          search forward', disabled=True),
+                MenuItem('  ?          search backward', disabled=True),
                 MenuItem('  S          sort trackers', disabled=True),
                 MenuItem(' 1, 2, ...   select page', disabled=True),
                 MenuItem(' a, b, ...   select tracker', disabled=True),
