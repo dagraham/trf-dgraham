@@ -44,12 +44,12 @@ The `spread` is the average of the absolute values of the differences between th
         early = forecast - η × spread
         late = forecast + η × spread
 
-where, by default, `η = 2`. With these settings at least 75% of the intervals would put the actual outcome between `early` and `late`. For the bird feeder example:
+where the value of η is set by the user. With `η = 3`, e.g., at least 1-1/3^2 ~= 89% of the intervals would put the actual outcome between `early` and `late`. For the bird feeder example:
 
         early = 240920T0700 - 2 × 1d1h = 240918T0500
         late = 240920T0700 + 2 × 1d1h = 240922T0900
 
-The list view reflects theses calculations:
+The list view reflects these calculations:
 
 {list}
 
@@ -176,6 +176,7 @@ As a final illustration, if you press `i` to inspect a tracker when the cursor i
 
 """
 
+fp = '👣'
 
 # Define replacements for image links or text alternatives
 image_replacements = {
@@ -196,32 +197,41 @@ image_replacements = {
 
 text_replacements = {
     "tracker": """\
-## trf-dgraham
-### tracker - record and forecast
-This is a simple application for tracking the sequence of occasions on which a task is completed and predicting when the next completion will likely be needed.
+                                           +---------------------+
+ trf-dgraham                               |           👣        |
+ tracker - record and forecast             |          👣         |
+ This is a simple application for tracking |            👣       |
+ the sequence of occasions on which a task |              👣     |
+ is completed and predicting when the next |             👣      |
+ completion will likely be needed.         |           👣        |
+                                           +---------------------+
         """,
     "inspect": """\
-    name:        fill bird feeders
-    doc_id:      1
-    created:     240915T1232
-    modified:    240923T1544
-    completions: (3)
-       240820T1900 +0m, 240829T0600 +1d, 240909T1900 +0m
-    intervals:   (2)
-       +9d11h, +11d13h
-       average:  10d12h↑
-       spread:   1d1h
-    forecast:    240920T0700
-       early:    240918T0500
-       late:     240922T0900
++----------------------------------------------------------------+
+|   name:        fill bird feeders                               |
+|   doc_id:      1                                               |
+|   created:     240915T1232                                     |
+|   modified:    240923T1544                                     |
+|   completions: (3)                                             |
+|      240820T1900 +0m, 240829T0600 +1d, 240909T1900 +0m         |
+|   intervals:   (2)                                             |
+|      +9d11h, +11d13h                                           |
+|      average:  10d12h↑                                         |
+|      spread:   1d1h                                            |
+|   forecast:    240920T0700                                     |
+|      early:    240918T0500                                     |
+|      late:     240922T0900                                     |
++----------------------------------------------------------------+
 """,
     "list": """\
-     tag   forecast  η spread   latest    name
-      a    24-09-20   2d2h     24-09-09   fill bird feeders
-      b    24-09-23   1d2h     24-09-13   between early and late
-      c    24-09-29   1d2h     24-09-19   before early
-      d       ~         ~      24-09-12   only one completion
-      e       ~         ~         ~       no completions yet
++----------------------------------------------------------------+
+|  tag   forecast  η spread   latest    name                     |
+|   a    24-09-20   2d2h     24-09-09   fill bird feeders        |
+|   b    24-09-23   1d2h     24-09-13   between early and late   |
+|   c    24-09-29   1d2h     24-09-19   before early             |
+|   d       ~         ~      24-09-12   only one completion      |
+|   e       ~         ~         ~       no completions yet       |
++----------------------------------------------------------------+
 """
 }
 
