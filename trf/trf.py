@@ -952,10 +952,6 @@ class TrackerManager:
         self.set_active_page(page_num)
         logger.debug(f"set page: {self.active_page = }")
 
-    def restore_active_page(self):
-        self.set_active_page(self.active_page)
-        logger.debug(f"restore active page: {self.active_page = }")
-
     def first_page(self):
         self.set_active_page(0)
         logger.debug(f"first page: {self.active_page = }")
@@ -1518,9 +1514,10 @@ def clear_search(*event):
     cancel(event)
 
 def clear_info(*event):
-    logger.debug(f"clear info with {tracker_manager.active_page = }")
-    set_mode
-    tracker_manager.restore_active_page()
+    set_mode('main')
+    logger.debug("clear info")
+    list_trackers()
+
 
 
 def menu(event=None):
@@ -1613,13 +1610,13 @@ def first_page(*event):
 
 def do_restore_defaults(*event):
     tracker_manager.restore_defaults()
-    display_message("Defaults restored.", 'info')
+    display_info("Defaults restored.", 'info')
 
 def save_to_clipboard(*event):
     # Access the content of the TextArea
     if display_area.text:
         pyperclip.copy(display_area.text)
-        display_message('display copied to system clipboard', 'info')
+        display_info('display copied to system clipboard', 'info')
 
 def do_help(*event):
     help_text = read_readme()
@@ -2074,7 +2071,7 @@ root_container = MenuContainer(
                 MenuItem('F1) toggle menu', handler=menu),
                 MenuItem('F2) about track', handler=do_about),
                 MenuItem('F3) check for updates', handler=do_check_updates),
-                MenuItem('F4) edit settings', handler=lambda: dialog_settings.start_dialog(None)),
+                MenuItem('F4) edit settings', handler=settings),
                 MenuItem('F5) refresh info', handler=refresh_info),
                 MenuItem('F6) restore default settings', handler=do_restore_defaults),
                 MenuItem('F7) copy display to clipboard', handler=save_to_clipboard),
