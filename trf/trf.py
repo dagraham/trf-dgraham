@@ -276,6 +276,7 @@ def preprocess_text(text):
     text = re.sub(r'(@\S+\s\S+)', lambda m: m.group(0).replace(' ', PLACEHOLDER), text)
     # Replace hyphens within words with NON_BREAKING_HYPHEN
     text = re.sub(r'(\S)-(\S)', lambda m: m.group(1) + NON_BREAKING_HYPHEN + m.group(2), text)
+        # logger.debug(f"listing {self.active_page = }, {start_index = }, {end_index = }")
     return text
 
 def postprocess_text(text):
@@ -356,7 +357,10 @@ class Tracker(Persistent):
             if short == 1:
                 ret = ''.join(until[:2]) if short else sign + ''.join(until)
             elif short == 2:
+                ret = f"{round(days + hours/24 + minutes/(60*24), 1)}"
+            elif short == 3:
                 ret = f"{round(days + hours/24 + minutes/(60*24), 1)}d"
+            logger.debug(f'{td = }, {short = }: {ret = }')
             return ret
         except Exception as e:
             logger.error(f'{td}: {e}')
@@ -519,6 +523,7 @@ class Tracker(Persistent):
     def compute_info(self):
         # Example computation based on history, returning a dict
         result = {}
+        logger.debug(f"Computing info for {self.name} ({self.doc_id})")
         if not self.history:
             result = dict(
                 last_completion=None, num_completions=0, num_intervals=0, average_interval=timedelta(minutes=0), last_interval=timedelta(minutes=0), spread=timedelta(minutes=0), next_expected_completion=None,
@@ -557,7 +562,7 @@ class Tracker(Persistent):
                 direction = UP if change > timedelta(0) else DOWN if change < timedelta(0) else "→"
                 result['avg'] = f"{Tracker.format_td(result['average_interval'], 2)}{direction}"
                 # logger.debug(f"{result['avg'] = }")
-                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 2): ^13}"
+                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 3): ^13}"
             if result['num_intervals'] >= 2:
                 total = timedelta(minutes=0)
                 for interval in result['intervals']:
@@ -567,9 +572,9 @@ class Tracker(Persistent):
                         total += interval - result['average_interval']
                 result['spread'] = total / result['num_intervals']
                 result['n_x_spread'] = tracker_manager.settings['η'] * result['spread']
-                result['n_spread'] = f"{tracker_manager.settings['η']} × {Tracker.format_td(result['spread'], 2)} = {Tracker.format_td(result['n_x_spread'], 2)}"
+                result['n_spread'] = f"{tracker_manager.settings['η']} × {Tracker.format_td(result['spread'], 3)} = {Tracker.format_td(result['n_x_spread'], 3)}"
 
-                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 2): >6}{PLUS_OR_MINUS}{Tracker.format_td(result['n_x_spread'], 2): <6}"
+                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 2): >6}{PLUS_OR_MINUS}{Tracker.format_td(result['n_x_spread'], 3): <6}"
 
             if result['num_intervals'] >= 1:
                 result['early']  = result['next_expected_completion'] - (tracker_manager.settings['η']*2) * result['spread']
@@ -707,7 +712,7 @@ class Tracker(Persistent):
         # logger.debug(f"{self.history = }")
         history = [f"{Tracker.format_dt(x[0])} {Tracker.format_td(x[1])}" for x in self.history] if self.history else []
         history = ', '.join(history)
-        intervals = [f"{Tracker.format_td(x, 2)}" for x in self._info['intervals']] if self._info.get('intervals') else []
+        intervals = [f"{Tracker.format_td(x, 3)}" for x in self._info['intervals']] if self._info.get('intervals') else []
         intervals = ', '.join(intervals) if intervals else ""
         return wrap(f"""\
  name:        {self.name}
@@ -719,7 +724,7 @@ class Tracker(Persistent):
  intervals:   ({self._info['num_intervals']})
     {intervals}
     average:  {self._info['avg']}
-    spread:   {Tracker.format_td(self._info['spread'], 2)}
+    spread:   {Tracker.format_td(self._info['spread'], 3)}
     η spread: {self._info.get('n_spread', '?')}
  next:    {Tracker.format_dt(self._info['next_expected_completion'])}
     early:    next - 2 × η spread = {Tracker.format_dt(self._info.get('early', '?'))}
@@ -946,8 +951,6 @@ class TrackerManager:
             logger.debug(f"{len(next) = }; {len(plus_or_minus) = }; {len(last) = }; {len(rows[-1]) = }")
         if self.selected_id:
             self.selected_row = self.id_to_row[self.selected_id]
-        # logger.debug(f"{self.id_to_row = }; {self.selected_row = }")
-        # logger.debug(f"listing {self.active_page = }, {start_index = }, {end_index = }")
         return banner +"\n".join(rows)
 
     def set_active_page(self, page_num):
@@ -955,12 +958,9 @@ class TrackerManager:
         if 0 <= page_num < (len(self.trackers) + 25) // 26:
             self.active_page = page_num
             logger.debug(f"setting active page to {page_num = }, {self.active_page = }")
-        # FIXME: this doesn't work. Why? Probably not worth fixing
-        # else:
-        #     logger.debug(f"Calling display_notice regarding invalid page number {page_num+1}")
-        #     display_area.text = wrap(f"Invalid page number {page_num+1}", 0)
-        #     display_notice(f"Back from invalid page {page_num+1}", 3)
-
+            display_area.buffer.cursor_position = (
+                display_area.buffer.document.translate_row_col_to_index(0, 0)
+            )
 
     def get_active_page(self):
         return self.active_page
@@ -989,7 +989,7 @@ class TrackerManager:
             return None
         self.selected_id = self.tag_to_id[pagetag]
         self.selected_tracker = self.trackers[self.tag_to_id[pagetag]]
-        self.selected_row = pagerow
+        self.selected_row = pagetag
         return self.trackers[self.tag_to_id[pagetag]]
 
     def get_tracker_from_row(self):
