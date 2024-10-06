@@ -10,13 +10,11 @@
 </div>
 
 
-
 ### Motivation
 
 As an example, consider the task of "filling the bird feeders". Suppose you want to have an idea when you should next fill them. One approach would be to set a reminder to fill them every 14 days starting from the last time you filled them. When the reminder is triggered, you could check the feeders to see if they are empty. If they are, you could fill them and then perhaps adjust the reminder to repeat every 13 days. On the other hand, if they are not yet empty, you might adjust the reminder to repeat every 15 days. Repeating this process, you might eventually set a repetition frequency for the reminder that predicts fairly well the next time you should fill them.
 
 The goal of *trf* is to save you trouble of going through this iterative process. Here's how it works:
-
 
 1. In *trf*, press "N" to add a new tracker and name it "fill bird feeders".
 2. The first time you fill the feeders, press "C" to add a completion, select the "fill bird feeders" tracker and enter the date and time of the completion. This date and time will be added to the history of completions for the "fill bird feeders" tracker.
