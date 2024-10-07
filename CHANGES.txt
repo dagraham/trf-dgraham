@@ -1,49 +1,53 @@
-Recent tagged changes as of 2024-10-04 15:26:05.023652:
-- 1 second ago (HEAD -> working, tag: 0.0.22) Daniel Graham
+Recent tagged changes as of 2024-10-07 05:51:37.090592:
+- 0 seconds ago (HEAD -> working, tag: 0.0.23) Daniel Graham
+    ff4d30c 2024-10-07 05:51:37 -0400
+    Tagged version 0.0.23.
+
+- 3 days ago (tag: 0.0.22) Daniel Graham
     4b89186 2024-10-04 15:26:04 -0400
     Tagged version 0.0.22.
 
-- 30 minutes ago (tag: 0.0.21) Daniel Graham
+- 3 days ago (tag: 0.0.21) Daniel Graham
     0a718ef 2024-10-04 14:56:10 -0400
     Tagged version 0.0.21.
 
-- 52 minutes ago (tag: 0.0.20) Daniel Graham
+- 3 days ago (tag: 0.0.20) Daniel Graham
     84eac48 2024-10-04 14:33:53 -0400
     Tagged version 0.0.20.
 
-- 17 hours ago (tag: 0.0.19) Daniel Graham
+- 3 days ago (tag: 0.0.19) Daniel Graham
     0ef1437 2024-10-03 22:47:10 -0400
     Tagged version 0.0.19.
 
-- 2 weeks ago (tag: 0.0.18) Daniel Graham
+- 3 weeks ago (tag: 0.0.18) Daniel Graham
     9e41e46 2024-09-18 12:07:45 -0400
     Tagged version 0.0.18.
 
-- 2 weeks ago (tag: 0.0.17) Daniel Graham
+- 3 weeks ago (tag: 0.0.17) Daniel Graham
     f8c5b52 2024-09-17 16:09:55 -0400
     Tagged version 0.0.17.
 
-- 2 weeks ago (tag: 0.0.16) Daniel Graham
+- 3 weeks ago (tag: 0.0.16) Daniel Graham
     fc8eb2e 2024-09-17 15:44:44 -0400
     Tagged version 0.0.16.
 
-- 2 weeks ago (tag: 0.0.15) Daniel Graham
+- 3 weeks ago (tag: 0.0.15) Daniel Graham
     dfa8b3f 2024-09-17 15:41:35 -0400
     Tagged version 0.0.15.
 
-- 2 weeks ago (tag: 0.0.14) Daniel Graham
+- 3 weeks ago (tag: 0.0.14) Daniel Graham
     d196a89 2024-09-17 15:37:13 -0400
     Tagged version 0.0.14.
 
-- 2 weeks ago (tag: 0.0.13) Daniel Graham
+- 3 weeks ago (tag: 0.0.13) Daniel Graham
     7f28824 2024-09-17 15:35:20 -0400
     Tagged version 0.0.13.
 
-- 2 weeks ago (tag: 0.0.12) Daniel Graham
+- 3 weeks ago (tag: 0.0.12) Daniel Graham
     9e379a2 2024-09-17 15:27:38 -0400
     Tagged version 0.0.12.
 
-- 2 weeks ago (tag: 0.0.11) Daniel Graham
+- 3 weeks ago (tag: 0.0.11) Daniel Graham
     0dbae6a 2024-09-17 14:24:42 -0400
     Tagged version 0.0.11.
 
@@ -74,8 +78,3 @@ Recent tagged changes as of 2024-10-04 15:26:05.023652:
 - 3 weeks ago (tag: 0.0.4) Daniel Graham
     923ecfd 2024-09-15 06:04:59 -0400
     Tagged version 0.0.4.
-
-- 3 weeks ago (tag: 0.0.3) Daniel Graham
-    0b39fd4 2024-09-14 22:58:46 -0400
-    Tagged version 0.0.3. refactored __init__.py only to
-    process_arguments
