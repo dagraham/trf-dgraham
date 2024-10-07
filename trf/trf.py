@@ -734,11 +734,6 @@ class Tracker(Persistent):
 
 def page_banner(active_page_num: int, number_of_pages: int, sort_by: str):
     return f"{active_page_num}/{number_of_pages}: {sort_by}"
-    # markers = []
-    # for i in range(1, number_of_pages + 1):
-    #     marker = CLOSED_CIRCLE if i == active_page_num else OPEN_CIRCLE
-    #     markers.append(marker)
-    # return ' '.join(markers)
 
 class TrackerManager:
 
@@ -865,21 +860,13 @@ class TrackerManager:
             if last_dt:
                 return (1, last_dt)
             return (2, tracker.doc_id)
-        # if self.sort_by == "timely":
-        #     if early_dt:
-        #         return (0, early_dt)
-        #     if forecast_dt:
-        #         return (1, forecast_dt)
-        #     if last_dt:
-        #         return (1, last_dt)
-        #     return (2, tracker.doc_id)
         if self.sort_by == "last":
             if last_dt:
                 return (0, last_dt)
             if forecast_dt:
                 return (1, forecast_dt)
             return (2, tracker.doc_id)
-        if self.sort_by == "name":
+        if self.sort_by == "subject":
             return (0, tracker.name)
         if self.sort_by == "id":
             return (1, tracker.doc_id)
@@ -906,7 +893,7 @@ class TrackerManager:
         sort = self.sort_by + UP if self.sort_by == 'modified' else self.sort_by + DOWN
 
         set_pages(page_banner(self.active_page + 1, self.num_pages, sort))
-        banner = f"{ZWNJ} tag     next       interval      last        tracker\n"
+        banner = f"{ZWNJ} tag     next       interval      last        subject\n"
         rows = []
 
         count = 0
@@ -1541,20 +1528,17 @@ def menusort(event=None):
 
 def sort(event=None):
     set_mode('sort')
-    # message_control.text = wrap(f" Sort by f)orecast, e)arly, l)atest, m)odified, n)ame or i)d", 0)
-    message_control.text = wrap(f" Sort by f)orecast, l)atest, m)odified, n)ame or i)d", 0)
+    message_control.text = wrap(f" Sort by n)ext, l)atest, m)odified, s)ubject or i)d", 0)
     set_mode('handle_sort')
 
 def handle_sort(event=None):
     key = event.key_sequence[0].key
-    # if key == 'e':
-    #     tracker_manager.sort_by = 'timely'
-    if key == 'f':
+    if key == 'n':
         tracker_manager.sort_by = 'next'
     elif key == 'l':
         tracker_manager.sort_by = 'last'
-    elif key == 'n':
-        tracker_manager.sort_by = 'name'
+    elif key == 's':
+        tracker_manager.sort_by = 'subject'
     elif key == 'm':
         tracker_manager.sort_by = 'modified'
     elif key == 'i':
@@ -1671,7 +1655,7 @@ def handle_settings(event=None):
 def new(event=None):
     set_mode('new') # set message display and bindings
     message_control.text = wrap("""\
-Enter the name of the new tracker. Optionally append a comma and the datetime of the first completion, and again, optionally, another comma and the timedelta of the expected interval until the next completion, e.g. 'name, 3p wed, +7d'.  Press 'enter' to save changes or '^c' to cancel.
+Enter the subject of the new tracker. Optionally append a comma and the datetime of the first completion, and again, optionally, another comma and the timedelta of the expected interval until the next completion, e.g. 'subject, 3p wed, +7d'.  Press 'enter' to save changes or '^c' to cancel.
 """, 0)
     app.layout.focus(input_area)
     set_mode('handle_new')
@@ -1832,9 +1816,9 @@ mode2bindings = {
         },
     'handle_sort': {
         # 'e': handle_sort,
-        'f': handle_sort,
-        'l': handle_sort,
         'n': handle_sort,
+        'l': handle_sort,
+        's': handle_sort,
         'm': handle_sort,
         'i': handle_sort,
         },
