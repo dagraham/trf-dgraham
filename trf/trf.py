@@ -1376,7 +1376,14 @@ info_lexer = InfoLexer()
 help_lexer = HelpLexer()
 default_lexer = DefaultLexer()
 
-display_area = TextArea(text="", read_only=True, search_field=search_field, lexer=tracker_lexer, scrollbar=True)
+display_area = TextArea(
+    text="",
+    read_only=True,
+    search_field=search_field,
+    lexer=tracker_lexer,
+    focus_on_click=True,
+    scrollbar=True
+    )
 
 def set_lexer(document_type: str):
     if document_type == 'list':
@@ -1439,9 +1446,16 @@ dialog_container = ConditionalContainer(
 )
 
 float_content = """
-This is a floating window with a border!
-More stuff here.
-Press Ctrl-Space to close.
+key        mode       command
+ /          ~       search forward
+ ?          ~       search backward
+ -        search    clear search
+ S         main     sort trackers
+ 1,2,...   main     select page
+ a,b,...   main     select tag row
+ space     main     first page
+ right     main     next page
+ left      main     previous page
 """
 
 status_control = FormattedTextControl(text=f"{format_statustime(datetime.now(), freq)}")
@@ -1503,10 +1517,10 @@ def read_readme():
 body = HSplit([
     # menu_container,
     display_area,
-    search_field,
     status_area,
     message_container, # Conditional Message Area
     dialog_container,  # Conditional Input Area
+    ConditionalContainer(content=search_field, filter=Condition(lambda: is_active_mode('search'))),
 ])
 
 # Boolean to track the visibility of the float
@@ -1557,52 +1571,23 @@ def set_float(content: str, title: str):
     )
     return Float(content=conditional_floating_content, top=top, left=left)
 
-float = set_float(float_content, "Floating Window")
+float = set_float(float_content, "Keyboard shortcuts")
 
 @kb.add('c-space')  # Control + Space
-def _(event):
+def toggle_shortcuts(*event):
     # Toggle the visibility flag
     float_visible[0] = not float_visible[0]
 
     # Force the app to refresh the layout to apply the visibility change
-    event.app.invalidate()
-
-# def display_float(event):
-#     global float_visible
-#     float_visible = not float_visible
-#     # Toggle visibility by adding/removing the float
-#     root_container.floats[0].visible = float_visible
-
-#     if not root_container.floats:
-#         logger.debug("creating floating window")
-#         # Get the current window size (screen size)
-#         screen_size = event.app.output.get_size()
-#         screen_width = screen_size.columns
-#         screen_height = screen_size.rows
-
-#         # Calculate centered position
-#         float_width = len(max(float_content.splitlines(), key=len)) + 4  # Width of the float
-#         float_height = float_content.count("\n") + 3  # Height of the float (including borders)
-#         top = (screen_height - float_height) // 2
-#         left = (screen_width - float_width) // 2
-
-#         # Add the floating window centered
-#         root_container.floats.append(Float(content=floating_content, top=top, left=left))
-#     else:
-#         # Remove the float to hide the window
-#         logger.debug("removing floating window")
-#         while len(root_container.floats) > 0:
-#             rm = root_container.floats.pop()
-#             logger.debug(f"pop {rm = }")
-
-#     event.app.invalidate()  # Force the app to refresh the layout
+    app.invalidate()
 
 
 def clear_search(*event):
+    logger.debug("clear search")
     search_state = get_app().current_search_state
     text = search_state.text
     search_state.text = ''
-    # cancel(event)
+    cancel(event)
 
 def clear_info(*event):
     set_mode('main')
@@ -1886,14 +1871,14 @@ def handle_history(event=None):
 mode = 'main'
 mode2bindings = {
     'main': {
+        # 'f6': do_restore_defaults,
         'f1': menu,
         'f2': do_about,
-        'f3': do_check_updates,
-        'f4': settings,
-        'f5': refresh_info,
-        'f6': do_restore_defaults,
-        'f7': save_to_clipboard,
-        'f8': do_help,
+        'f3': settings,
+        'f4': do_help,
+        'c-i': refresh_info,
+        'c-c': save_to_clipboard,
+        'c-q': exit_app,
         'S': sort,
         'N': new,
         'C': complete,
@@ -1904,7 +1889,6 @@ mode2bindings = {
         'left': previous_page,
         'right': next_page,
         'space': first_page,
-        'c-q': exit_app,
         },
     'inspect': {
         'enter': list_trackers,
@@ -1985,7 +1969,7 @@ def set_bindings():
     global kb
     for current_mode, bindings in mode2bindings.items():
         for key, method in bindings.items():
-            kb.add(key, filter=Condition(lambda m=current_mode: is_active_mode(m)))(method)
+            kb.add(key, filter=Condition(lambda m=current_mode: is_active_mode(m)),eager=True)(method)
 
     tag_keys = list(string.ascii_lowercase)
     for key in tag_keys:
@@ -2211,21 +2195,22 @@ root_container = MenuContainer(
     body=body,
     menu_items=[
         MenuItem(
-            'system',
+            'menu',
             children=[
+                # MenuItem('F3) check for updates', handler=do_check_updates),
+                # MenuItem('F6) restore default settings', handler=do_restore_defaults),
                 MenuItem('F1) toggle menu', handler=menu),
-                MenuItem('F2) about track', handler=do_about),
-                MenuItem('F3) check for updates', handler=do_check_updates),
-                MenuItem('F4) edit settings', handler=settings),
-                MenuItem('F5) refresh info', handler=refresh_info),
-                MenuItem('F6) restore default settings', handler=do_restore_defaults),
-                MenuItem('F7) copy display to clipboard', handler=save_to_clipboard),
-                MenuItem('F8) help', handler=do_help),
+                MenuItem('F2) about trf', handler=do_about),
+                MenuItem('F3) edit settings', handler=settings),
+                MenuItem('F4) help', handler=do_help),
+                MenuItem('^i) refresh info', handler=refresh_info),
+                MenuItem('^space) display shortcuts', handler= toggle_shortcuts),
+                MenuItem('^c) copy display to clipboard', handler=save_to_clipboard),
                 MenuItem('^q) quit', handler=exit_app),
             ]
         ),
         MenuItem(
-            'keys',
+            'selected',
             children=[
                 MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
                 MenuItem('N) create new tracker', handler=lambda: new(None)),
