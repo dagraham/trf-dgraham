@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, date
 import time
 from prompt_toolkit.widgets import (
     TextArea,
+    Frame,
     SearchToolbar,
     MenuContainer,
     MenuItem,
@@ -52,7 +53,7 @@ import re
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.widgets import TextArea
-from prompt_toolkit.layout import Layout
+from prompt_toolkit.layout import Layout, Float, FloatContainer, Window
 import logging
 from persistent import Persistent
 import pyperclip
@@ -76,6 +77,7 @@ from ruamel.yaml.comments import CommentedMap
 import ZODB, ZODB.FileStorage
 import transaction
 
+freq = 12
 
 def setup_logging(trf_home, log_level=logging.INFO, backup_count=7):
     """
@@ -542,7 +544,7 @@ class Tracker(Persistent):
             result['timely'] = None
             result['tardy'] = None
             result['avg'] = None
-            result['plus_or_minus'] = f"{6*' '}~{6*' '}"
+            result['plus_or_minus'] = f"{5*' '}~{5*' '}"
             if result['num_completions'] > 0:
                 for i in range(len(self.history)-1):
                     #                      x[i+1]                  y[i+1]               x[i]
@@ -562,7 +564,7 @@ class Tracker(Persistent):
                 direction = UP if change > timedelta(0) else DOWN if change < timedelta(0) else "→"
                 result['avg'] = f"{Tracker.format_td(result['average_interval'], 2)}{direction}"
                 # logger.debug(f"{result['avg'] = }")
-                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 3): ^13}"
+                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 3): ^11}"
             if result['num_intervals'] >= 2:
                 total = timedelta(minutes=0)
                 for interval in result['intervals']:
@@ -893,7 +895,7 @@ class TrackerManager:
         sort = self.sort_by + UP if self.sort_by == 'modified' else self.sort_by + DOWN
 
         set_pages(page_banner(self.active_page + 1, self.num_pages, sort))
-        banner = f"{ZWNJ} tag     next       interval      last        subject\n"
+        banner = f"{ZWNJ} tag     next      interval     last        subject\n"
         rows = []
 
         count = 0
@@ -955,19 +957,28 @@ class TrackerManager:
     def next_page(self):
         # new_page = min(self.get_active_page() + 1, self.num_pages - 1)
         self.set_active_page(self.get_active_page() + 1)
+        self.selected_id = None
+        self.selected_row = (self.active_page, 0)
         logger.debug(f"next page: {self.active_page = }")
 
     def previous_page(self):
         self.set_active_page(self.get_active_page() - 1)
+        self.selected_row = (self.active_page, 0)
+        self.selected_id = None
+
         logger.debug(f"previous page: {self.active_page = }")
 
     def set_page(self, page_num):
         self.set_active_page(page_num)
+        self.selected_id = None
+        self.selected_row = (self.active_page, 0)
         logger.debug(f"set page: {self.active_page = }")
 
     def first_page(self):
         self.set_active_page(0)
-        logger.debug(f"first page: {self.active_page = }")
+        self.selected_id = None
+        self.selected_row = (self.active_page, 0)
+        logger.debug(f"first page: {self.selected_row = }")
 
 
     def get_tracker_from_tag(self, tag: str):
@@ -1246,9 +1257,9 @@ class TrackerLexer(Lexer):
                 next_formatted = f"  {next_date: ^8}"  # 10 spaces for next date
                 if "±" in interval:
                     iparts = interval.split("±")
-                    spread_formatted = f"  {iparts[0]: >5} ± {iparts[1]: <5}"
+                    spread_formatted = f"  {iparts[0]: >5}±{iparts[1]: <5}"
                 else:
-                    spread_formatted = f"  {interval: ^13}"
+                    spread_formatted = f"  {interval: ^11}"
                 last_formatted = f"  {last_date: ^8}"
                 # Add the styled parts to the tokens list
                 tokens.append((list_style.get('tag', ''), tag_formatted))
@@ -1427,7 +1438,11 @@ dialog_container = ConditionalContainer(
     filter=Condition(lambda: dialog_visible[0])
 )
 
-freq = 12
+float_content = """
+This is a floating window with a border!
+More stuff here.
+Press Ctrl-Space to close.
+"""
 
 status_control = FormattedTextControl(text=f"{format_statustime(datetime.now(), freq)}")
 status_window = Window(content=status_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.LEFT)
@@ -1494,12 +1509,94 @@ body = HSplit([
     dialog_container,  # Conditional Input Area
 ])
 
+# Boolean to track the visibility of the float
+float_visible = [False]  # Use a list so we can modify it within a closure
+
+def display_float(event):
+    # Toggle the visibility flag
+    float_visible[0] = not float_visible[0]
+
+    # Force the app to refresh the layout to apply the visibility change
+    event.app.invalidate()
+
+
+screen_width, screen_height = shutil.get_terminal_size()
+
+
 kb = KeyBindings()
 
 @kb.add('c-q')
 def exit_app(*event):
     """Exit the application."""
     app.exit()
+
+def set_float(content: str, title: str):
+    # Create a FormattedTextControl to dynamically display the content
+    screen_width, screen_height = shutil.get_terminal_size()
+    content = content.strip()
+    float_lines = [f" {x.rstrip()}" for x in content.split('\n')]
+    float_width = max(len(x) for x in float_lines) + 4
+    float_height = len(float_lines) + 3
+    top = (screen_height - float_height) // 4
+    left = (screen_width - float_width) // 2
+
+    float_text_control = FormattedTextControl(text="\n".join(float_lines))
+
+    # Create the floating content and wrap it with a Frame to add a border
+    floating_content = Frame(
+        body=Window(
+            content=float_text_control,
+            height=len(float_lines)
+            ),
+        title=title,
+        )
+    # Create a ConditionalContainer to control the visibility of the Float
+    conditional_floating_content = ConditionalContainer(
+        content=floating_content,
+        filter=Condition(lambda: float_visible[0])  # Control visibility based on float_visible
+    )
+    return Float(content=conditional_floating_content, top=top, left=left)
+
+float = set_float(float_content, "Floating Window")
+
+@kb.add('c-space')  # Control + Space
+def _(event):
+    # Toggle the visibility flag
+    float_visible[0] = not float_visible[0]
+
+    # Force the app to refresh the layout to apply the visibility change
+    event.app.invalidate()
+
+# def display_float(event):
+#     global float_visible
+#     float_visible = not float_visible
+#     # Toggle visibility by adding/removing the float
+#     root_container.floats[0].visible = float_visible
+
+#     if not root_container.floats:
+#         logger.debug("creating floating window")
+#         # Get the current window size (screen size)
+#         screen_size = event.app.output.get_size()
+#         screen_width = screen_size.columns
+#         screen_height = screen_size.rows
+
+#         # Calculate centered position
+#         float_width = len(max(float_content.splitlines(), key=len)) + 4  # Width of the float
+#         float_height = float_content.count("\n") + 3  # Height of the float (including borders)
+#         top = (screen_height - float_height) // 2
+#         left = (screen_width - float_width) // 2
+
+#         # Add the floating window centered
+#         root_container.floats.append(Float(content=floating_content, top=top, left=left))
+#     else:
+#         # Remove the float to hide the window
+#         logger.debug("removing floating window")
+#         while len(root_container.floats) > 0:
+#             rm = root_container.floats.pop()
+#             logger.debug(f"pop {rm = }")
+
+#     event.app.invalidate()  # Force the app to refresh the layout
+
 
 def clear_search(*event):
     search_state = get_app().current_search_state
@@ -2128,10 +2225,10 @@ root_container = MenuContainer(
             ]
         ),
         MenuItem(
-            'edit',
+            'keys',
             children=[
-                MenuItem('N) create new tracker', handler=lambda: new(None)),
                 MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
+                MenuItem('N) create new tracker', handler=lambda: new(None)),
                 MenuItem('R) rename tracker', handler=lambda: rename(None)),
                 MenuItem('C) add completion', handler=lambda: complete(None)),
                 MenuItem('H) edit history', handler=lambda: history(None)),
@@ -2145,7 +2242,8 @@ root_container = MenuContainer(
                 MenuItem(' a, b, ...   select tracker', disabled=True),
             ]
         ),
-    ]
+    ],
+    floats=[float]  # Keep the float in place
 )
 
 def set_pages(txt: str):
