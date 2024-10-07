@@ -1,21 +1,19 @@
 
- trf-dgraham                                      +--------------+
-                                                  |      👣      |
- tracker - record and forecast                    |     👣       |
- This is a simple application for tracking        |       👣     |
- the sequence of occasions on which a task        |         👣   |
- is completed and predicting when the next        |        👣    |
- completion will likely be needed.                |      👣      |
-                                                  +--------------+
+ trf-dgraham                                      ┏━━━━━━━━━━━━━━┓
+                                                  ┃      👣      ┃
+ tracker - record and forecast                    ┃     👣       ┃
+ This is a simple application for tracking        ┃       👣     ┃
+ the sequence of occasions on which a task        ┃         👣   ┃
+ is completed and predicting when the next        ┃        👣    ┃
+ completion will likely be needed.                ┃      👣      ┃
+                                                  ┗━━━━━━━━━━━━━━┛
         
-
 
 ### Motivation
 
 As an example, consider the task of "filling the bird feeders". Suppose you want to have an idea when you should next fill them. One approach would be to set a reminder to fill them every 14 days starting from the last time you filled them. When the reminder is triggered, you could check the feeders to see if they are empty. If they are, you could fill them and then perhaps adjust the reminder to repeat every 13 days. On the other hand, if they are not yet empty, you might adjust the reminder to repeat every 15 days. Repeating this process, you might eventually set a repetition frequency for the reminder that predicts fairly well the next time you should fill them.
 
 The goal of *trf* is to save you trouble of going through this iterative process. Here's how it works:
-
 
 1. In *trf*, press "N" to add a new tracker and name it "fill bird feeders".
 2. The first time you fill the feeders, press "C" to add a completion, select the "fill bird feeders" tracker and enter the date and time of the completion. This date and time will be added to the history of completions for the "fill bird feeders" tracker.
@@ -35,21 +33,21 @@ The recorded history of completions is thus a list of (datetime, timedelta) pair
 
 Here is an illustration of the "inspect" display for the "fill bird feeders" tracker showing a history of three completions together with the corresponding two intervals and other related calculations:
 
-+----------------------------------------------------------------+
-|   name:        fill bird feeders                               |
-|   doc_id:      1                                               |
-|   created:     240915T1232                                     |
-|   modified:    240923T1544                                     |
-|   completions: (3)                                             |
-|      240820T1900 +0m, 240829T0600 +1d, 240909T1900 +0m         |
-|   intervals:   (2)                                             |
-|      +9d11h, +11d13h                                           |
-|      average:  10d12h↑                                         |
-|      spread:   1d1h                                            |
-|   forecast:    240920T0700                                     |
-|      early:    240918T0500                                     |
-|      late:     240922T0900                                     |
-+----------------------------------------------------------------+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃   name:        fill bird feeders                               ┃
+┃   doc_id:      1                                               ┃
+┃   created:     240915T1232                                     ┃
+┃   modified:    240923T1544                                     ┃
+┃   completions: (3)                                             ┃
+┃      240820T1900 +0m, 240829T0600 +1d, 240909T1900 +0m         ┃
+┃   intervals:   (2)                                             ┃
+┃      +9d11h, +11d13h                                           ┃
+┃      average:  10d12h↑                                         ┃
+┃      spread:   1d1h                                            ┃
+┃   forecast:    240920T0700                                     ┃
+┃      early:    240918T0500                                     ┃
+┃      late:     240922T0900                                     ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 
 Datetimes are reported using 6 digits for the date and 4 digits for the 24-hour time separated by `T`: `yymmddTHHMM`.  Timedeltas are reported as integer numbers of d (days), h (hours) and m (minutes).
@@ -71,14 +69,14 @@ where the value of η is set by the user. With `η = 3`, e.g., at least 1-1/3^2 
 
 The list view reflects these calculations:
 
-+----------------------------------------------------------------+
-|  tag   forecast  η spread   latest    name                     |
-|   a    24-09-20   2d2h     24-09-09   fill bird feeders        |
-|   b    24-09-23   1d2h     24-09-13   between early and late   |
-|   c    24-09-29   1d2h     24-09-19   before early             |
-|   d       ~         ~      24-09-12   only one completion      |
-|   e       ~         ~         ~       no completions yet       |
-+----------------------------------------------------------------+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  tag   forecast  η spread   latest    name                     ┃
+┃   a    24-09-20   2d2h     24-09-09   fill bird feeders        ┃
+┃   b    24-09-23   1d2h     24-09-13   between early and late   ┃
+┃   c    24-09-29   1d2h     24-09-19   before early             ┃
+┃   d       ~         ~      24-09-12   only one completion      ┃
+┃   e       ~         ~         ~       no completions yet       ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
 
 In this view, the `tag` column presents a convenient way of selecting a tracker for use in another command. E.g., pressing `c`  would move the cursor to the row corresponding to tag `c`. Because only lower-case letters are used for tags, only 26 tags can be displayed on a single page in list view. When there are more than 26 trackers, the list view is divided into multiple pages with the left and right cursor keys used to navigate between pages. An option is to press the integer corresponding to a page number and immediately move the cursor to the first row of that page. Only a single digit can be used with this mechanism but this still allows 9 * 26 = 234 trackers to be quickly selected using at most 2 key presses.
