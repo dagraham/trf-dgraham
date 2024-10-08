@@ -78,6 +78,7 @@ import ZODB, ZODB.FileStorage
 import transaction
 
 freq = 12
+mode = 'main'
 
 def setup_logging(trf_home, log_level=logging.INFO, backup_count=7):
     """
@@ -220,16 +221,17 @@ PLACEHOLDER = '\u00A0'
 NON_BREAKING_HYPHEN = '\u2011'
 # Placeholder for zero-width non-joiner
 ZWNJ = '\u200C'
-
 PLUS_OR_MINUS = '±'
 
 # For showing active page in pages, e.g.,  ○ ○ ⏺ ○ = page 3 of 4 pages
 OPEN_CIRCLE = '○'
 CLOSED_CIRCLE = '⏺'
-# num_sigma = 'η'
+ETA = 'η'
+APPROX = '≈'
 
 UP = '↑'
 DOWN = '↓'
+RIGHT = '→'
 
 
 def wrap(text: str, indent: int = 3, width: int = shutil.get_terminal_size()[0] - 3):
@@ -561,7 +563,7 @@ class Tracker(Persistent):
                 result['timely'] = result['next_expected_completion'] - timedelta(days=1)
                 result['tardy'] = result['next_expected_completion'] + timedelta(days=1)
                 change = result['intervals'][-1] - result['average_interval']
-                direction = UP if change > timedelta(0) else DOWN if change < timedelta(0) else "→"
+                direction = UP if change > timedelta(0) else DOWN if change < timedelta(0) else RIGHT
                 result['avg'] = f"{Tracker.format_td(result['average_interval'], 2)}{direction}"
                 # logger.debug(f"{result['avg'] = }")
                 result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 3): ^11}"
@@ -893,9 +895,15 @@ class TrackerManager:
         self.num_pages = (len(self.trackers) + 25) // 26
 
         sort = self.sort_by + UP if self.sort_by == 'modified' else self.sort_by + DOWN
+        n = self.settings.get('η', None)
+        if n:
+            interval = f" η={n} {int(round(100*(1 - 1/(n*n)), 0))}%"
+            # interval = f"{int(round(100*(1 - 1/(n*n)), 0))}% span"
+        else: #        " n=3 89%"
+            interval = "interval"
 
         set_pages(page_banner(self.active_page + 1, self.num_pages, sort))
-        banner = f"{ZWNJ} tag     next      interval     last        subject\n"
+        banner = f"{ZWNJ} tag     next      {interval}     last        subject\n"
         rows = []
 
         count = 0
@@ -1571,12 +1579,20 @@ def set_float(content: str, title: str):
     )
     return Float(content=conditional_floating_content, top=top, left=left)
 
-float = set_float(float_content, "Keyboard shortcuts")
+# float = set_float(float_content, "Keyboard shortcuts")
 
+float = None
 @kb.add('c-space')  # Control + Space
-def toggle_shortcuts(*event):
+def toggle_shortcuts(event=None):
+    logger.debug(f"toggle_shortcuts: {float_visible = }")
     # Toggle the visibility flag
     float_visible[0] = not float_visible[0]
+    # if float_visible[0] and not mode.startswith('handle_'):
+    #     output = [f"{mode}"]
+    #     for key, command in mode2bindings[mode].items():
+    #         output.append(f"      {key: <8} {command.__name__}")
+    # float = set_float(float_content, "Keyboard shortcuts")
+
 
     # Force the app to refresh the layout to apply the visibility change
     app.invalidate()
@@ -1594,8 +1610,6 @@ def clear_info(*event):
     logger.debug("clear info")
     list_trackers()
 
-
-
 def menu(event=None):
     """Focus menu."""
     if event:
@@ -1604,14 +1618,12 @@ def menu(event=None):
         else:
             app.layout.focus(root_container.window)
 
-def menusort(event=None):
-    sort(event)
-    handle_sort(event)
 
 def sort(event=None):
     set_mode('sort')
     message_control.text = wrap(f" Sort by n)ext, l)atest, m)odified, s)ubject or i)d", 0)
     set_mode('handle_sort')
+
 
 def handle_sort(event=None):
     key = event.key_sequence[0].key
@@ -1627,15 +1639,25 @@ def handle_sort(event=None):
         tracker_manager.sort_by = 'id'
     close_dialog(changed=True)
 
+
 def display_info(msg: str, doc_type: str = 'info'):
-    set_mode('info')
     display_message(msg, 'info')
+    set_mode('info')
+
 
 def do_about(*event):
     display_info('about track ...')
 
-def do_check_updates(*event):
-    display_info('update info ...')
+
+def do_commands(*event):
+    output = ["Commands"]
+    for mode, bindings in mode2bindings.items():
+        if mode.startswith('handle'):
+            continue
+        output.append(f"   {mode}")
+        for key, command in bindings.items():
+            output.append(f"      {key: <8} {command.__name__}")
+    display_info("\n".join(output))
 
 def refresh_info(*event):
     tracker_manager.refresh_info()
@@ -1868,14 +1890,14 @@ def handle_history(event=None):
         close_dialog(changed=True)
 
 
-mode = 'main'
 mode2bindings = {
     'main': {
         # 'f6': do_restore_defaults,
         'f1': menu,
         'f2': do_about,
-        'f3': settings,
-        'f4': do_help,
+        'f3': do_commands,
+        'f4': settings,
+        'f5': do_help,
         'c-i': refresh_info,
         'c-c': save_to_clipboard,
         'c-q': exit_app,
@@ -1885,16 +1907,20 @@ mode2bindings = {
         'R': rename,
         'H': history,
         'D': delete,
-        'enter': inspect_tracker, # show details
+        'space': inspect_tracker, # show details
         'left': previous_page,
         'right': next_page,
-        'space': first_page,
+        # 'enter': first_page,
         },
+    # 'menu': {
+    #     'enter': leave_menu,
+    #     'escape': leave_menu,
+    # },
     'inspect': {
-        'enter': list_trackers,
+        'space': list_trackers,
         },
-    'sort': {
-        },
+    # 'sort': {
+    #     },
     'handle_sort': {
         # 'e': handle_sort,
         'n': handle_sort,
@@ -1922,8 +1948,8 @@ mode2bindings = {
     'handle_settings': {
         'c-s': handle_settings,
         },
-    'delete': {
-        },
+    # 'delete': {
+    #     },
     'search': {
         'escape': clear_search,
         },
@@ -2002,10 +2028,12 @@ def set_bindings():
 
     # log_key_bindings(kb)
 
+floats = []
+
 dialog_visible = [False]
 message_visable = [False]
 def set_mode(active_mode):
-    global dialog_visible, message_visible, mode
+    global dialog_visible, message_visible, mode, floats
     mode = active_mode
     right_control.text = f"{mode} "
     dialog_visible[0] = (
@@ -2014,6 +2042,21 @@ def set_mode(active_mode):
     message_visible[0] = (
         mode in ['delete', 'handle_delete', 'sort', 'handle_sort']
         )
+
+    logger.debug(f"setting float for mode {mode}")
+    output = [f"{mode}"]
+    for key, command in mode2bindings.get(mode, {}).items():
+        output.append(f"  {key: <8} {command.__name__}")
+    output.append("  c-space  close shortcuts")
+    float = set_float("\n".join(output), "active keys for " + mode)
+    logger.debug(f"{len(floats) = }")
+    if floats:
+        floats.pop(0)
+        logger.debug(f"{len(floats) = }")
+    floats.append(float)
+    logger.debug(f"{len(floats) = }")
+    # floats = [float]
+    logger.debug(f"{output = }")
     logger.debug(f"dialog_visible: {dialog_visible}; message_visible: {message_visible}")
     # log_key_bindings(kb)
 
@@ -2195,40 +2238,47 @@ root_container = MenuContainer(
     body=body,
     menu_items=[
         MenuItem(
-            'menu',
+            '☰ task tracker',
             children=[
-                # MenuItem('F3) check for updates', handler=do_check_updates),
-                # MenuItem('F6) restore default settings', handler=do_restore_defaults),
                 MenuItem('F1) toggle menu', handler=menu),
                 MenuItem('F2) about trf', handler=do_about),
-                MenuItem('F3) edit settings', handler=settings),
-                MenuItem('F4) help', handler=do_help),
-                MenuItem('^i) refresh info', handler=refresh_info),
-                MenuItem('^space) display shortcuts', handler= toggle_shortcuts),
-                MenuItem('^c) copy display to clipboard', handler=save_to_clipboard),
-                MenuItem('^q) quit', handler=exit_app),
+                MenuItem('F3) commands', handler=do_commands),
+                MenuItem('F4) edit settings', handler=settings),
+                MenuItem('F5) readme', handler=do_help),
+                # MenuItem('^i) refresh info', handler=refresh_info),
+                # MenuItem('^space) toggle shortcuts', handler=lambda: toggle_shortcuts(None)),
+                # MenuItem('^c) copy display to clipboard', handler=save_to_clipboard),
+                MenuItem('^q) quit', handler=lambda: exit_app(None)),
+                # MenuItem('F1     toggle menu', disabled=True),
+                # MenuItem('F2     about trf', disabled=True),
+                # MenuItem('F3     edit settings', disabled=True),
+                # MenuItem('F4     help', disabled=True),
+                # MenuItem('^i     refresh info', disabled=True),
+                # MenuItem('^space toggle shortcuts', disabled=True),
+                # MenuItem('^c     copy display to clipboard', disabled=True),
+                # MenuItem('^q     quit', disabled=True),
             ]
         ),
-        MenuItem(
-            'selected',
-            children=[
-                MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
-                MenuItem('N) create new tracker', handler=lambda: new(None)),
-                MenuItem('R) rename tracker', handler=lambda: rename(None)),
-                MenuItem('C) add completion', handler=lambda: complete(None)),
-                MenuItem('H) edit history', handler=lambda: history(None)),
-                MenuItem('D) delete tracker', handler=lambda: delete(None)),
-                MenuItem('---  shortcuts  ---', disabled=True),
-                MenuItem('key press    command  ', disabled=True),
-                MenuItem('  /          search forward', disabled=True),
-                MenuItem('  ?          search backward', disabled=True),
-                MenuItem('  S          sort trackers', disabled=True),
-                MenuItem(' 1, 2, ...   select page', disabled=True),
-                MenuItem(' a, b, ...   select tracker', disabled=True),
-            ]
-        ),
+        # MenuItem(
+        #     'selected',
+        #     children=[
+        #         MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
+        #         MenuItem('N) create new tracker', handler=lambda: new(None)),
+        #         MenuItem('R) rename tracker', handler=lambda: rename(None)),
+        #         MenuItem('C) add completion', handler=lambda: complete(None)),
+        #         MenuItem('H) edit history', handler=lambda: history(None)),
+        #         MenuItem('D) delete tracker', handler=lambda: delete(None)),
+        #         MenuItem('---  shortcuts  ---', disabled=True),
+        #         MenuItem('key press    command  ', disabled=True),
+        #         MenuItem('  /          search forward', disabled=True),
+        #         MenuItem('  ?          search backward', disabled=True),
+        #         MenuItem('  S          sort trackers', disabled=True),
+        #         MenuItem(' 1, 2, ...   select page', disabled=True),
+        #         MenuItem(' a, b, ...   select tracker', disabled=True),
+        #     ]
+        # ),
     ],
-    floats=[float]  # Keep the float in place
+    floats=floats  # Keep the float in place
 )
 
 def set_pages(txt: str):
