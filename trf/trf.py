@@ -1556,18 +1556,16 @@ def set_float(content: str, title: str):
     # Create a FormattedTextControl to dynamically display the content
     screen_width, screen_height = shutil.get_terminal_size()
     content = content.strip()
-    float_lines = [f" {x.rstrip()}" for x in content.split('\n')]
+    float_lines = [f" {x.rstrip()} " for x in content.split('\n')]
     float_width = max(len(x) for x in float_lines) + 4
     float_height = len(float_lines) + 3
     top = (screen_height - float_height) // 4
     left = (screen_width - float_width) // 2
 
-    float_text_control = FormattedTextControl(text="\n".join(float_lines))
-
     # Create the floating content and wrap it with a Frame to add a border
     floating_content = Frame(
         body=Window(
-            content=float_text_control,
+            content=FormattedTextControl(text="\n".join(float_lines)),
             height=len(float_lines)
             ),
         title=title,
@@ -1579,20 +1577,14 @@ def set_float(content: str, title: str):
     )
     return Float(content=conditional_floating_content, top=top, left=left)
 
-# float = set_float(float_content, "Keyboard shortcuts")
 
 float = None
-@kb.add('c-space')  # Control + Space
+# @kb.add('c-space')  # Control + Space
+@kb.add('.')  # Control + Space
 def toggle_shortcuts(event=None):
     logger.debug(f"toggle_shortcuts: {float_visible = }")
     # Toggle the visibility flag
     float_visible[0] = not float_visible[0]
-    # if float_visible[0] and not mode.startswith('handle_'):
-    #     output = [f"{mode}"]
-    #     for key, command in mode2bindings[mode].items():
-    #         output.append(f"      {key: <8} {command.__name__}")
-    # float = set_float(float_content, "Keyboard shortcuts")
-
 
     # Force the app to refresh the layout to apply the visibility change
     app.invalidate()
@@ -2028,12 +2020,59 @@ def set_bindings():
 
     # log_key_bindings(kb)
 
-floats = []
+root_container = MenuContainer(
+    body=body,
+    menu_items=[
+        MenuItem(
+            '☰ task tracker',
+            children=[
+                MenuItem('F1) toggle menu', handler=menu),
+                MenuItem('F2) about trf', handler=do_about),
+                MenuItem('F3) commands', handler=do_commands),
+                MenuItem('F4) edit settings', handler=settings),
+                MenuItem('F5) readme', handler=do_help),
+                # MenuItem('^i) refresh info', handler=refresh_info),
+                # MenuItem('^space) toggle shortcuts', handler=lambda: toggle_shortcuts(None)),
+                # MenuItem('^c) copy display to clipboard', handler=save_to_clipboard),
+                MenuItem('^q) quit', handler=lambda: exit_app(None)),
+                # MenuItem('F1     toggle menu', disabled=True),
+                # MenuItem('F2     about trf', disabled=True),
+                # MenuItem('F3     edit settings', disabled=True),
+                # MenuItem('F4     help', disabled=True),
+                # MenuItem('^i     refresh info', disabled=True),
+                # MenuItem('^space toggle shortcuts', disabled=True),
+                # MenuItem('^c     copy display to clipboard', disabled=True),
+                # MenuItem('^q     quit', disabled=True),
+            ]
+        ),
+        # MenuItem(
+        #     'selected',
+        #     children=[
+        #         MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
+        #         MenuItem('N) create new tracker', handler=lambda: new(None)),
+        #         MenuItem('R) rename tracker', handler=lambda: rename(None)),
+        #         MenuItem('C) add completion', handler=lambda: complete(None)),
+        #         MenuItem('H) edit history', handler=lambda: history(None)),
+        #         MenuItem('D) delete tracker', handler=lambda: delete(None)),
+        #         MenuItem('---  shortcuts  ---', disabled=True),
+        #         MenuItem('key press    command  ', disabled=True),
+        #         MenuItem('  /          search forward', disabled=True),
+        #         MenuItem('  ?          search backward', disabled=True),
+        #         MenuItem('  S          sort trackers', disabled=True),
+        #         MenuItem(' 1, 2, ...   select page', disabled=True),
+        #         MenuItem(' a, b, ...   select tracker', disabled=True),
+        #     ]
+        # ),
+    ],
+    floats=[]  # Keep the float in place
+)
+
 
 dialog_visible = [False]
 message_visable = [False]
+
 def set_mode(active_mode):
-    global dialog_visible, message_visible, mode, floats
+    global dialog_visible, message_visible, mode #, root_container
     mode = active_mode
     right_control.text = f"{mode} "
     dialog_visible[0] = (
@@ -2044,19 +2083,20 @@ def set_mode(active_mode):
         )
 
     logger.debug(f"setting float for mode {mode}")
-    output = [f"{mode}"]
-    for key, command in mode2bindings.get(mode, {}).items():
-        output.append(f"  {key: <8} {command.__name__}")
-    output.append("  c-space  close shortcuts")
-    float = set_float("\n".join(output), "active keys for " + mode)
-    logger.debug(f"{len(floats) = }")
-    if floats:
-        floats.pop(0)
-        logger.debug(f"{len(floats) = }")
-    floats.append(float)
-    logger.debug(f"{len(floats) = }")
-    # floats = [float]
-    logger.debug(f"{output = }")
+    if not mode.startswith('handle'):
+        output = [f".        close {mode} keys"]
+        for key, command in mode2bindings.get(mode, {}).items():
+            output.append(f"{key: <8} {command.__name__}")
+        float = set_float("\n".join(output), f"{mode} keys")
+        logger.debug(f"{len(root_container.floats) = }")
+        # NOTE: floats[0] must be for the menu - don't remove it
+        while len(root_container.floats) > 1:
+            root_container.floats.pop(1)
+        logger.debug(f"{len(root_container.floats) = }")
+        root_container.floats.append(float)
+        logger.debug(f"{len(root_container.floats) = }")
+        # floats = [float]
+        logger.debug(f"{output = }")
     logger.debug(f"dialog_visible: {dialog_visible}; message_visible: {message_visible}")
     # log_key_bindings(kb)
 
@@ -2233,53 +2273,6 @@ def del_example_trackers(*event):
         tracker_manager.delete_tracker(id)
     list_trackers()
 
-
-root_container = MenuContainer(
-    body=body,
-    menu_items=[
-        MenuItem(
-            '☰ task tracker',
-            children=[
-                MenuItem('F1) toggle menu', handler=menu),
-                MenuItem('F2) about trf', handler=do_about),
-                MenuItem('F3) commands', handler=do_commands),
-                MenuItem('F4) edit settings', handler=settings),
-                MenuItem('F5) readme', handler=do_help),
-                # MenuItem('^i) refresh info', handler=refresh_info),
-                # MenuItem('^space) toggle shortcuts', handler=lambda: toggle_shortcuts(None)),
-                # MenuItem('^c) copy display to clipboard', handler=save_to_clipboard),
-                MenuItem('^q) quit', handler=lambda: exit_app(None)),
-                # MenuItem('F1     toggle menu', disabled=True),
-                # MenuItem('F2     about trf', disabled=True),
-                # MenuItem('F3     edit settings', disabled=True),
-                # MenuItem('F4     help', disabled=True),
-                # MenuItem('^i     refresh info', disabled=True),
-                # MenuItem('^space toggle shortcuts', disabled=True),
-                # MenuItem('^c     copy display to clipboard', disabled=True),
-                # MenuItem('^q     quit', disabled=True),
-            ]
-        ),
-        # MenuItem(
-        #     'selected',
-        #     children=[
-        #         MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
-        #         MenuItem('N) create new tracker', handler=lambda: new(None)),
-        #         MenuItem('R) rename tracker', handler=lambda: rename(None)),
-        #         MenuItem('C) add completion', handler=lambda: complete(None)),
-        #         MenuItem('H) edit history', handler=lambda: history(None)),
-        #         MenuItem('D) delete tracker', handler=lambda: delete(None)),
-        #         MenuItem('---  shortcuts  ---', disabled=True),
-        #         MenuItem('key press    command  ', disabled=True),
-        #         MenuItem('  /          search forward', disabled=True),
-        #         MenuItem('  ?          search backward', disabled=True),
-        #         MenuItem('  S          sort trackers', disabled=True),
-        #         MenuItem(' 1, 2, ...   select page', disabled=True),
-        #         MenuItem(' a, b, ...   select tracker', disabled=True),
-        #     ]
-        # ),
-    ],
-    floats=floats  # Keep the float in place
-)
 
 def set_pages(txt: str):
     page_control.text = f"{txt} "
