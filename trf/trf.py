@@ -32,7 +32,9 @@ from prompt_toolkit.widgets import (
     MenuContainer,
     MenuItem,
     HorizontalLine,
+    Label
 )
+
 from prompt_toolkit.key_binding.bindings.focus import (
     focus_next,
     focus_previous,
@@ -531,7 +533,7 @@ class Tracker(Persistent):
         if not self.history:
             result = dict(
                 last_completion=None, num_completions=0, num_intervals=0, average_interval=timedelta(minutes=0), last_interval=timedelta(minutes=0), spread=timedelta(minutes=0), next_expected_completion=None,
-                early=None, timely=None, tardy=None, avg=None, plus_or_minus=f"{6*' '}~{6*' '}"
+                early=None, timely=None, tardy=None, avg=None, plus_or_minus=f"{5*' '}~{5*' '}"
                 )
         else:
             result['last_completion'] = self.history[-1] if len(self.history) > 0 else None
@@ -578,7 +580,7 @@ class Tracker(Persistent):
                 result['n_x_spread'] = tracker_manager.settings['η'] * result['spread']
                 result['n_spread'] = f"{tracker_manager.settings['η']} × {Tracker.format_td(result['spread'], 3)} = {Tracker.format_td(result['n_x_spread'], 3)}"
 
-                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 2): >6}{PLUS_OR_MINUS}{Tracker.format_td(result['n_x_spread'], 3): <6}"
+                result['plus_or_minus'] = f"{Tracker.format_td(result['average_interval'], 2): >5}{PLUS_OR_MINUS}{Tracker.format_td(result['n_x_spread'], 3): <5}"
 
             if result['num_intervals'] >= 1:
                 result['early']  = result['next_expected_completion'] - (tracker_manager.settings['η']*2) * result['spread']
@@ -922,7 +924,7 @@ class TrackerManager:
             early = tracker._info.get('early', '') if hasattr(tracker, '_info') else ''
             timely = tracker._info.get('timely', '') if hasattr(tracker, '_info') else ''
             tardy = tracker._info.get('tardy', '') if hasattr(tracker, '_info') else ''
-            plus_or_minus = tracker._info.get('plus_or_minus', '') if hasattr(tracker, '_info') else f"{6*' '}~{6*' '}"
+            plus_or_minus = tracker._info.get('plus_or_minus', '') if hasattr(tracker, '_info') else f"{5*' '}~{5*' '}"
             average = tracker._info.get('average_interval', '') if hasattr(tracker, '_info') else ''
             if tracker.history:
                 last = tracker.history[-1][0].strftime("%y-%m-%d")
@@ -1565,8 +1567,10 @@ def set_float(content: str, title: str):
     # Create the floating content and wrap it with a Frame to add a border
     floating_content = Frame(
         body=Window(
-            content=FormattedTextControl(text="\n".join(float_lines)),
-            height=len(float_lines)
+            content=FormattedTextControl(
+                text="\n".join(float_lines),
+                ),
+            height=len(float_lines),
             ),
         title=title,
         )
@@ -1613,7 +1617,7 @@ def menu(event=None):
 
 def sort(event=None):
     set_mode('sort')
-    message_control.text = wrap(f" Sort by n)ext, l)atest, m)odified, s)ubject or i)d", 0)
+    message_control.text = wrap(f" Sort by n)ext, l)ast, m)odified, s)ubject or i)d", 0)
     set_mode('handle_sort')
 
 
@@ -2020,53 +2024,27 @@ def set_bindings():
 
     # log_key_bindings(kb)
 
+
+menu_items=[
+    MenuItem(
+        '☰',
+        children=[
+            MenuItem('F1) toggle menu', handler=menu),
+            MenuItem('F2) about trf', handler=do_about),
+            MenuItem('F3) commands', handler=do_commands),
+            MenuItem('F4) edit settings', handler=settings),
+            MenuItem('F5) readme', handler=do_help),
+        ]
+    ),
+    Label(text="task tracker", style="class:menu-title"),
+]
+
+# Create a MenuContainer using the custom menu bar
 root_container = MenuContainer(
     body=body,
-    menu_items=[
-        MenuItem(
-            '☰ task tracker',
-            children=[
-                MenuItem('F1) toggle menu', handler=menu),
-                MenuItem('F2) about trf', handler=do_about),
-                MenuItem('F3) commands', handler=do_commands),
-                MenuItem('F4) edit settings', handler=settings),
-                MenuItem('F5) readme', handler=do_help),
-                # MenuItem('^i) refresh info', handler=refresh_info),
-                # MenuItem('^space) toggle shortcuts', handler=lambda: toggle_shortcuts(None)),
-                # MenuItem('^c) copy display to clipboard', handler=save_to_clipboard),
-                MenuItem('^q) quit', handler=lambda: exit_app(None)),
-                # MenuItem('F1     toggle menu', disabled=True),
-                # MenuItem('F2     about trf', disabled=True),
-                # MenuItem('F3     edit settings', disabled=True),
-                # MenuItem('F4     help', disabled=True),
-                # MenuItem('^i     refresh info', disabled=True),
-                # MenuItem('^space toggle shortcuts', disabled=True),
-                # MenuItem('^c     copy display to clipboard', disabled=True),
-                # MenuItem('^q     quit', disabled=True),
-            ]
-        ),
-        # MenuItem(
-        #     'selected',
-        #     children=[
-        #         MenuItem('enter) toggle details', handler=lambda: inspect_tracker(None)),
-        #         MenuItem('N) create new tracker', handler=lambda: new(None)),
-        #         MenuItem('R) rename tracker', handler=lambda: rename(None)),
-        #         MenuItem('C) add completion', handler=lambda: complete(None)),
-        #         MenuItem('H) edit history', handler=lambda: history(None)),
-        #         MenuItem('D) delete tracker', handler=lambda: delete(None)),
-        #         MenuItem('---  shortcuts  ---', disabled=True),
-        #         MenuItem('key press    command  ', disabled=True),
-        #         MenuItem('  /          search forward', disabled=True),
-        #         MenuItem('  ?          search backward', disabled=True),
-        #         MenuItem('  S          sort trackers', disabled=True),
-        #         MenuItem(' 1, 2, ...   select page', disabled=True),
-        #         MenuItem(' a, b, ...   select tracker', disabled=True),
-        #     ]
-        # ),
-    ],
-    floats=[]  # Keep the float in place
-)
-
+    menu_items=menu_items,
+    floats=[]
+    )
 
 dialog_visible = [False]
 message_visable = [False]
@@ -2083,20 +2061,22 @@ def set_mode(active_mode):
         )
 
     logger.debug(f"setting float for mode {mode}")
-    if not mode.startswith('handle'):
-        output = [f".        close {mode} keys"]
+    if True: #not mode.startswith('handle'):
+        output = []
         for key, command in mode2bindings.get(mode, {}).items():
             output.append(f"{key: <8} {command.__name__}")
-        float = set_float("\n".join(output), f"{mode} keys")
-        logger.debug(f"{len(root_container.floats) = }")
-        # NOTE: floats[0] must be for the menu - don't remove it
-        while len(root_container.floats) > 1:
-            root_container.floats.pop(1)
-        logger.debug(f"{len(root_container.floats) = }")
-        root_container.floats.append(float)
-        logger.debug(f"{len(root_container.floats) = }")
-        # floats = [float]
-        logger.debug(f"{output = }")
+        if len(output) > 0:
+            output.insert(0, ".        close this window")
+            float = set_float("\n".join(output), f"{mode} keys")
+            logger.debug(f"{len(root_container.floats) = }")
+            # NOTE: floats[0] must be for the menu - don't remove it
+            while len(root_container.floats) > 1:
+                root_container.floats.pop(1)
+            logger.debug(f"{len(root_container.floats) = }")
+            root_container.floats.append(float)
+            logger.debug(f"{len(root_container.floats) = }")
+            # floats = [float]
+            logger.debug(f"{output = }")
     logger.debug(f"dialog_visible: {dialog_visible}; message_visible: {message_visible}")
     # log_key_bindings(kb)
 
