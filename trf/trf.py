@@ -907,7 +907,7 @@ class TrackerManager:
         name_width = shutil.get_terminal_size()[0] - 45
         self.num_pages = (len(self.trackers) + 25) // 26
 
-        sort = self.sort_by + UP if self.sort_by == 'modified' else self.sort_by + DOWN
+        sort = self.sort_by + DOWN if self.sort_by == 'modified' else self.sort_by + UP
         n = self.settings.get('η', None)
         if n:
             interval = f" η={n} {int(round(100*(1 - 1/(n*n)), 0))}%"
@@ -1614,9 +1614,25 @@ def menu(event=None):
 
 
 def sort(event=None):
-    set_mode('sort')
-    message_control.text = wrap(f" Sort by n)ext, l)ast, m)odified, s)ubject or i)d", 0)
-    set_mode('handle_sort')
+    if mode == 'main':
+        message_control.text = wrap(f" Sort by n)ext, l)ast, m)odified, s)ubject or i)d", 0)
+        set_mode('sort')
+    elif mode == 'sort':
+        key = event.key_sequence[0].key
+        if key == 'n':
+            tracker_manager.sort_by = 'next'
+        elif key == 'l':
+            tracker_manager.sort_by = 'last'
+        elif key == 's':
+            tracker_manager.sort_by = 'subject'
+        elif key == 'm':
+            tracker_manager.sort_by = 'modified'
+        elif key == 'i':
+            tracker_manager.sort_by = 'id'
+        close_dialog(changed=True)
+    else:
+        return
+
 
 
 def sort_by(event=None):
@@ -1955,7 +1971,7 @@ def set_mode_bindings():
             '.': toggle_shortcuts,
             },
         'sort': {
-            sort_keys: sort_by,
+            sort_keys: sort,
             '.': toggle_shortcuts,
             },
         'new': {
@@ -2046,7 +2062,7 @@ menu_items=[
 
         ]
     ),
-    Label(text="task tracker", style="class:menu-title"),
+    Label(text="trf: task record and forecast", style="class:menu-title"),
 ]
 
 # Create a MenuContainer using the custom menu bar
@@ -2107,8 +2123,6 @@ def search_forward(event):
     # Your custom logic to set search mode
     logger.debug("setting search mode")
     set_mode('search')
-    # Now trigger the built-in search
-    # Now trigger the built-in search
     start_search(display_area.control)
 
 # @kb.add('?')
@@ -2117,16 +2131,7 @@ def search_backward(event):
     # Your custom logic to set search mode
     logger.debug("setting search mode")
     set_mode('search')
-    # Now trigger the built-in search
-    # Now trigger the built-in search
     start_search(display_area.control, SearchDirection.BACKWARD)
-
-# # Retain the default behavior by not interfering with the rest
-# @kb.add('/', filter=Condition(lambda: True))  # Filter ensures it won't overwrite
-# def _(event):
-#     # This does nothing, allowing the default search binding to stay active
-#     logger.debug("passing through /")
-#     pass
 
 set_mode('main')
 
@@ -2140,7 +2145,6 @@ status_area = VSplit(
     ],
     height=1,
 )
-
 
 def display_message(message: str, document_type: str = 'list'):
     """Log messages to the text area."""
