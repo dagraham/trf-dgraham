@@ -1,5 +1,7 @@
 # trf/trf.py
 from typing import List, Dict, Any, Callable, Mapping
+from collections import OrderedDict
+
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from prompt_toolkit import Application
@@ -1455,19 +1457,6 @@ dialog_container = ConditionalContainer(
     filter=Condition(lambda: dialog_visible[0])
 )
 
-float_content = """
-key        mode       command
- /          ~       search forward
- ?          ~       search backward
- -        search    clear search
- S         main     sort trackers
- 1,2,...   main     select page
- a,b,...   main     select tag row
- space     main     first page
- right     main     next page
- left      main     previous page
-"""
-
 status_control = FormattedTextControl(text=f"{format_statustime(datetime.now(), freq)}")
 status_window = Window(content=status_control, height=1, style="class:status-window", width=D(preferred=20), align=WindowAlign.LEFT)
 
@@ -1561,8 +1550,8 @@ def set_float(content: str, title: str):
     float_lines = [f" {x.rstrip()} " for x in content.split('\n')]
     float_width = max(len(x) for x in float_lines) + 4
     float_height = len(float_lines) + 3
-    top = (screen_height - float_height) // 4
-    left = (screen_width - float_width) // 2
+    top = 0 # (screen_height - float_height) // 4
+    left = (screen_width - float_width) # // 2
 
     # Create the floating content and wrap it with a Frame to add a border
     floating_content = Frame(
@@ -1584,7 +1573,7 @@ def set_float(content: str, title: str):
 
 float = None
 # @kb.add('c-space')  # Control + Space
-@kb.add('.')  # Control + Space
+# @kb.add('.')  # Control + Space
 def toggle_shortcuts(event=None):
     logger.debug(f"toggle_shortcuts: {float_visible = }")
     # Toggle the visibility flag
@@ -1621,7 +1610,7 @@ def sort(event=None):
     set_mode('handle_sort')
 
 
-def handle_sort(event=None):
+def sort_by(event=None):
     key = event.key_sequence[0].key
     if key == 'n':
         tracker_manager.sort_by = 'next'
@@ -1684,15 +1673,18 @@ def list_trackers(*event):
     app.layout.focus(display_area)
     app.invalidate()
 
-def inspect_tracker(*event):
+def toggle_inspect(*event):
     logger.debug("inspect tracker")
-    tracker = tracker_manager.get_tracker_from_row()
-    if not tracker:
-        return
-    set_mode('inspect')
-    display_message(f"{tracker.get_tracker_info()}", 'info')
-    app.layout.focus(display_area)
-    app.invalidate()
+    if mode == 'main':
+        tracker = tracker_manager.get_tracker_from_row()
+        if not tracker:
+            return
+        set_mode('inspect')
+        display_message(f"{tracker.get_tracker_info()}", 'info')
+        app.layout.focus(display_area)
+        app.invalidate()
+    elif mode == 'inspect':
+        list_trackers()
 
 
 def first_page(*event):
@@ -1793,16 +1785,16 @@ def handle_new(event=None):
                 changed = True
     close_dialog(changed=changed)
 
-def delete(event=None):
+def _delete(event=None):
     tracker = tracker_manager.get_tracker_from_row()
     if not tracker:
         return
     set_mode('delete')
     message = f" Delete tracker [{tracker.doc_id}] {tracker.name}?\n Press 'y' to delete or 'n' to cancel.\n"
     message_control.text = wrap(message, 0)
-    set_mode('handle_delete')
+    set_mode('delete')
 
-def handle_delete(event=None):
+def delete(event=None):
     key = event.key_sequence[0].key
     logger.debug(f"got key: {key = }")
     changed = False
@@ -1885,74 +1877,98 @@ def handle_history(event=None):
         tracker_manager.remove_completions(tracker_manager.selected_id)
         close_dialog(changed=True)
 
+def move_to_page(event):
+    page = event.key_sequence[0].key if event else None
+    if not page and page in range(1, 10):
+        return
+    logger.debug(f"got {page = }, {type(page) = }")
 
-mode2bindings = {
-    'main': {
-        # 'f6': do_restore_defaults,
-        'f1': menu,
-        'f2': do_about,
-        'f3': do_commands,
-        'f4': settings,
-        'f5': do_help,
-        'c-i': refresh_info,
-        'c-c': save_to_clipboard,
-        'c-q': exit_app,
-        'S': sort,
-        'N': new,
-        'C': complete,
-        'R': rename,
-        'H': history,
-        'D': delete,
-        'space': inspect_tracker, # show details
-        'left': previous_page,
-        'right': next_page,
-        # 'enter': first_page,
-        },
-    # 'menu': {
-    #     'enter': leave_menu,
-    #     'escape': leave_menu,
-    # },
-    'inspect': {
-        'space': list_trackers,
-        },
-    # 'sort': {
-    #     },
-    'handle_sort': {
-        # 'e': handle_sort,
-        'n': handle_sort,
-        'l': handle_sort,
-        's': handle_sort,
-        'm': handle_sort,
-        'i': handle_sort,
-        },
-    'handle_new': {
-        'c-s': handle_new,
-        },
-    'handle_delete': {
-        'y': handle_delete,
-        'n': handle_delete
-        },
-    'handle_complete' : {
-        'c-s': handle_complete,
-        },
-    'handle_rename' : {
-        'c-s': handle_rename,
-        },
-    'handle_history' : {
-        'c-s': handle_history,
-        },
-    'handle_settings': {
-        'c-s': handle_settings,
-        },
-    # 'delete': {
-    #     },
-    'search': {
-        'escape': clear_search,
-        },
-    'info': {
-        'escape': clear_info,
-        },
-    }
+    # tracker_manager.set_active_page(int(page)-1)
+    tracker_manager.set_page(int(page)-1)
+    list_trackers()
+
+
+def move_to_tag(event):
+    tag = event.key_sequence[0].key if event else None
+    logger.debug(f"got {tag = }")
+    if not tag:
+        return
+    row = list(string.ascii_lowercase).index(tag) + 1
+    display_area.buffer.cursor_position = (
+        display_area.buffer.document.translate_row_col_to_index(row, 0)
+    )
+
+def set_mode_bindings():
+    page_keys = tuple([str(x) for x in range(1, 10)])
+    tag_keys = tuple([x for x in string.ascii_lowercase])
+    sort_keys = ('n', 'l', 'm', 's', 'i')
+    bool_keys = ('y', 'n')
+    mode2bindings = {
+        'main': OrderedDict([
+            ('.', toggle_shortcuts),
+            ('f1', menu),
+            ('f2', do_about),
+            ('f3', toggle_shortcuts),
+            ('f4', settings),
+            ('f5', do_help),
+            ('S', sort),
+            ('N', new),
+            ('C', complete),
+            ('R', rename),
+            ('H', history),
+            ('D', _delete),
+            ('space', toggle_inspect),
+            ('left', previous_page),
+            ('right', next_page),
+            (tag_keys, move_to_tag),
+            (page_keys, move_to_page),
+            ('c-i', refresh_info),
+            ('c-c', save_to_clipboard),
+            ('c-q', exit_app),
+            ]),
+        'inspect': {
+            'space': toggle_inspect,
+            '.': toggle_shortcuts,
+            },
+        'sort': {
+            sort_keys: sort_by,
+            '.': toggle_shortcuts,
+            },
+        'handle_new': {
+            'c-s': handle_new,
+            # '.': toggle_shortcuts,
+            },
+        'delete': {
+            bool_keys: delete,
+            '.': toggle_shortcuts,
+            },
+        'handle_complete' : {
+            'c-s': handle_complete,
+            # '.': toggle_shortcuts,
+            },
+        'handle_rename' : {
+            'c-s': handle_rename,
+            # '.': toggle_shortcuts,
+            },
+        'handle_history' : {
+            'c-s': handle_history,
+            # '.': toggle_shortcuts,
+            },
+        'handle_settings': {
+            'c-s': handle_settings,
+            # '.': toggle_shortcuts,
+            },
+        'search': {
+            'escape': clear_search,
+            },
+        'info': {
+            'escape': clear_info,
+            },
+        }
+
+    return mode2bindings
+
+mode2bindings = set_mode_bindings()
 
 def log_key_bindings(kb: KeyBindings):
     log_output = []
@@ -1969,18 +1985,6 @@ def log_key_bindings(kb: KeyBindings):
 def is_active_mode(m: str)-> bool:
     return m == mode
 
-def move_to_tag(event):
-    tag = event.key_sequence[0].key if event else None
-    if not tag:
-        return
-    row = list(string.ascii_lowercase).index(tag) + 1
-    display_area.cursor_position = (row, 0)
-
-def move_to_page(event):
-    page = event.key_sequence[0].key if event else None
-    if not page:
-        return
-    tracker_manager.set_active_page(int(page))
 
 def set_bindings():
     """/
@@ -1991,35 +1995,15 @@ def set_bindings():
     global kb
     for current_mode, bindings in mode2bindings.items():
         for key, method in bindings.items():
-            kb.add(key, filter=Condition(lambda m=current_mode: is_active_mode(m)),eager=True)(method)
+            if isinstance(key, tuple):
+                for k in key:
+                    kb.add(k, filter=Condition(lambda m=current_mode: is_active_mode(m)), eager=True)(method)
+            else:
+                kb.add(key, filter=Condition(lambda m=current_mode: is_active_mode(m)),eager=True)(method)
 
-    tag_keys = list(string.ascii_lowercase)
-    for key in tag_keys:
-        @kb.add(key, filter=Condition(lambda: is_active_mode('main')))
-        def _(event):  # Use i=i to capture the current value of i
-            tag = event.key_sequence[0].key if event else None
-            logger.debug(f"got {tag = }")
-            if not tag:
-                return
-            row = list(string.ascii_lowercase).index(tag) + 1
-            logger.debug(f"got {row = }")
-            display_area.buffer.cursor_position = (
-                display_area.buffer.document.translate_row_col_to_index(row, 0)
-            )
 
-    page_keys = list(range(1, 10))
-    for key in page_keys:
-        @kb.add(str(key), filter=Condition(lambda: is_active_mode('main')))
-        def _event(event):
-            # move_to_page(event)
-            key = event.key_sequence[0].key if event else None
-            logger.debug(f"got {key = }, {type(key) = }")
-            if not key:
-                return
-            tracker_manager.set_page(int(key)-1)
-            list_trackers()
 
-    for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history', 'handle_sort', 'handle_delete', 'handle_settings']:
+    for current_mode in ['handle_new', 'handle_complete', 'handle_rename', 'handle_history', 'handle_sort', 'delete', 'handle_settings']:
         kb.add('escape', filter=Condition(lambda m=current_mode: is_active_mode(m)), eager=True)(cancel)
 
     # log_key_bindings(kb)
@@ -2029,11 +2013,13 @@ menu_items=[
     MenuItem(
         '☰',
         children=[
-            MenuItem('F1) toggle menu', handler=menu),
-            MenuItem('F2) about trf', handler=do_about),
-            MenuItem('F3) commands', handler=do_commands),
-            MenuItem('F4) edit settings', handler=settings),
-            MenuItem('F5) readme', handler=do_help),
+            MenuItem('F1 toggle menu', handler=menu),
+            MenuItem('F2 about trf', handler=do_about),
+            MenuItem('F3 edit settings', handler=settings),
+            MenuItem('F4 readme', handler=do_help),
+            MenuItem('.  show/hide shortcuts', handler=toggle_shortcuts),
+            MenuItem('^q exit', handler=exit_app),
+
         ]
     ),
     Label(text="task tracker", style="class:menu-title"),
@@ -2050,24 +2036,36 @@ dialog_visible = [False]
 message_visable = [False]
 
 def set_mode(active_mode):
-    global dialog_visible, message_visible, mode #, root_container
+    global dialog_visible, message_visible, float_visible, mode #, root_container
     mode = active_mode
+    float_visible[0] = False
     right_control.text = f"{mode} "
     dialog_visible[0] = (
         mode in ['new', 'complete', 'rename', 'history', 'handle_new', 'handle_complete', 'handle_rename', 'handle_history', 'handle_settings']
         )
     message_visible[0] = (
-        mode in ['delete', 'handle_delete', 'sort', 'handle_sort']
+        mode in ['delete', 'delete', 'sort', 'handle_sort']
         )
 
     logger.debug(f"setting float for mode {mode}")
     if True: #not mode.startswith('handle'):
         output = []
         for key, command in mode2bindings.get(mode, {}).items():
-            output.append(f"{key: <8} {command.__name__}")
+            if isinstance(key, tuple):
+                if len(key) > 2:
+                    name = f"{key[0]} {key[1]} … {key[-1]}"
+                else:
+                    name = " ".join([x for x in key])
+                output.append(f"{name: <8} {command.__name__}")
+
+                # output.append(f"{key[0]: <8} {key[1]: <8} {command.__name__}")
+            else:
+                if key.startswith('f'):
+                    continue
+                output.append(f"{key: <8} {command.__name__}")
         if len(output) > 0:
-            output.insert(0, ".        close this window")
-            float = set_float("\n".join(output), f"{mode} keys")
+            # output.insert(0, f".        close this window")
+            float = set_float("\n".join(output), f"{mode} shortcuts")
             logger.debug(f"{len(root_container.floats) = }")
             # NOTE: floats[0] must be for the menu - don't remove it
             while len(root_container.floats) > 1:
