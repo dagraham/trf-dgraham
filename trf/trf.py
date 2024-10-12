@@ -1,7 +1,6 @@
 # trf/trf.py
 from typing import List, Dict, Any, Callable, Mapping
 from collections import OrderedDict
-
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from prompt_toolkit import Application
@@ -23,8 +22,6 @@ from prompt_toolkit.styles import Style
 from prompt_toolkit.styles.named_colors import NAMED_COLORS
 from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.search import start_search, SearchDirection
-
-
 from datetime import datetime, timedelta, date
 import time
 from prompt_toolkit.widgets import (
@@ -36,7 +33,6 @@ from prompt_toolkit.widgets import (
     HorizontalLine,
     Label
 )
-
 from prompt_toolkit.key_binding.bindings.focus import (
     focus_next,
     focus_previous,
