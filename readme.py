@@ -244,12 +244,6 @@ def generate_readme():
     with open("trf/README.txt", "w") as f:
         f.write(readme_template.format(**text_combined))
 
-# def generate_readme():
-#     with open("README.md", "w") as f:
-#         f.write(readme_template.format(**image_replacements))
-#     with open("trf/README.txt", "w") as f:
-#         f.write(readme_template.format(**text_replacements))
-
 if __name__ == "__main__":
     print("generating README.md and README.txt")
     generate_readme()

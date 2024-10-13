@@ -1,7 +1,6 @@
 # trf/trf.py
 from typing import List, Dict, Any, Callable, Mapping
 from collections import OrderedDict
-
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from prompt_toolkit import Application
@@ -23,8 +22,6 @@ from prompt_toolkit.styles import Style
 from prompt_toolkit.styles.named_colors import NAMED_COLORS
 from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.search import start_search, SearchDirection
-
-
 from datetime import datetime, timedelta, date
 import time
 from prompt_toolkit.widgets import (
@@ -36,7 +33,6 @@ from prompt_toolkit.widgets import (
     HorizontalLine,
     Label
 )
-
 from prompt_toolkit.key_binding.bindings.focus import (
     focus_next,
     focus_previous,
@@ -63,21 +59,13 @@ from persistent import Persistent
 import pyperclip
 import importlib.resources
 import glob
-
 import lorem
 from lorem.text import TextLorem
-
 from .__version__ import version
-
 from . import trf_home, log_level, restore, backup_dir, db_path
-
-# from . import storage, db, connection, root, transaction
-
 from .backup import backup_to_zip, rotate_backups, restore_from_zip
-
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
-
 import ZODB, ZODB.FileStorage
 import transaction
 
@@ -534,8 +522,18 @@ class Tracker(Persistent):
         logger.debug(f"Computing info for {self.name} ({self.doc_id})")
         if not self.history:
             result = dict(
-                last_completion=None, num_completions=0, num_intervals=0, average_interval=timedelta(minutes=0), last_interval=timedelta(minutes=0), spread=timedelta(minutes=0), next_expected_completion=None,
-                early=None, timely=None, tardy=None, avg=None, plus_or_minus=f"{5*' '}~{5*' '}"
+                last_completion=None, 
+                num_completions=0, 
+                num_intervals=0, 
+                average_interval=timedelta(minutes=0), 
+                last_interval=timedelta(minutes=0), 
+                spread=timedelta(minutes=0), 
+                next_expected_completion=None,
+                early=None, 
+                timely=None, 
+                tardy=None, 
+                avg=None, 
+                plus_or_minus=f"{5*' '}~{5*' '}"
                 )
         else:
             result['last_completion'] = self.history[-1] if len(self.history) > 0 else None
