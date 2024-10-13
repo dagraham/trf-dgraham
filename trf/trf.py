@@ -66,6 +66,7 @@ from . import trf_home, log_level, restore, backup_dir, db_path
 from .backup import backup_to_zip, rotate_backups, restore_from_zip
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+import ZODB, ZODB.FileStorage
 import transaction
 
 freq = 12
