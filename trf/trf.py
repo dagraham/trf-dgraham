@@ -522,8 +522,18 @@ class Tracker(Persistent):
         logger.debug(f"Computing info for {self.name} ({self.doc_id})")
         if not self.history:
             result = dict(
-                last_completion=None, num_completions=0, num_intervals=0, average_interval=timedelta(minutes=0), last_interval=timedelta(minutes=0), spread=timedelta(minutes=0), next_expected_completion=None,
-                early=None, timely=None, tardy=None, avg=None, plus_or_minus=f"{5*' '}~{5*' '}"
+                last_completion=None, 
+                num_completions=0, 
+                num_intervals=0, 
+                average_interval=timedelta(minutes=0), 
+                last_interval=timedelta(minutes=0), 
+                spread=timedelta(minutes=0), 
+                next_expected_completion=None,
+                early=None, 
+                timely=None, 
+                tardy=None, 
+                avg=None, 
+                plus_or_minus=f"{5*' '}~{5*' '}"
                 )
         else:
             result['last_completion'] = self.history[-1] if len(self.history) > 0 else None
